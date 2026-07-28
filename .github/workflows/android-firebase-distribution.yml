@@ -1,0 +1,73 @@
+name: Android Firebase App Distribution
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  distribute-android:
+    name: Build & distribute Android app
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Write Firebase service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$FIREBASE_SERVICE_ACCOUNT" ]; then
+            echo "::error::FIREBASE_SERVICE_ACCOUNT secret is not set."
+            exit 1
+          fi
+          printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > androidApp/firebase-service-account.json
+
+      - name: Write release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PASSWORD" ] || [ -z "$ANDROID_KEY_ALIAS" ] || [ -z "$ANDROID_KEY_PASSWORD" ]; then
+            echo "::error::One or more ANDROID_KEYSTORE_* / ANDROID_KEY_* secrets are not set."
+            exit 1
+          fi
+          mkdir -p androidApp/keystore
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > androidApp/keystore/hikyaku-release.keystore
+          {
+            echo "storeFile=keystore/hikyaku-release.keystore"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > androidApp/keystore.properties
+
+      - name: Configure local.properties
+        run: |
+          {
+            echo "firebase.serviceCredentialsFile=$GITHUB_WORKSPACE/androidApp/firebase-service-account.json"
+            echo "sdk.dir=$ANDROID_SDK_ROOT"
+          } > local.properties
+
+      - name: Set version info
+        run: echo "GIT_SHA=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
+
+      - name: Build APK and upload to Firebase App Distribution
+        run: >
+          ./gradlew :androidApp:appDistributionUploadRelease --stacktrace
+          -PappVersionCode=${{ github.run_number }}
+          -PappVersionName=1.0.0-${{ env.GIT_SHA }}

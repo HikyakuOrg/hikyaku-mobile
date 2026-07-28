@@ -80,7 +80,6 @@ android {
     firebaseAppDistributionDefault {
         appId = "1:416030763139:android:c60889d1fdc1a2c88593b6"
         artifactType = "APK"
-        testers = "danielquah1997@gmail.com"
         releaseNotes = "First Hikyaku Android build via Firebase App Distribution"
         serviceCredentialsFile = localProps.getProperty("firebase.serviceCredentialsFile")
     }
