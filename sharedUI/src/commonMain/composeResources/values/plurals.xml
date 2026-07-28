@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <plurals name="shift_packages_count">
+        <item quantity="one">%1$d package</item>
+        <item quantity="other">%1$d packages</item>
+    </plurals>
+    <plurals name="home_packages_to_deliver_count">
+        <item quantity="one">%1$d package to deliver</item>
+        <item quantity="other">%1$d packages to deliver</item>
+    </plurals>
+    <plurals name="shift_scan_remaining_count">
+        <item quantity="one">%1$d package left</item>
+        <item quantity="other">%1$d packages left</item>
+    </plurals>
+</resources>

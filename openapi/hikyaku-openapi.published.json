@@ -1,0 +1,2276 @@
+{
+    "openapi": "3.0.0",
+    "paths": {
+      "/geocode/search": {
+        "get": {
+          "operationId": "GeocodeController_search",
+          "parameters": [
+            {
+              "name": "text",
+              "required": true,
+              "in": "query",
+              "description": "Free-text search string. Mapped onto Photon`s `q` param.",
+              "schema": {
+                "example": "Marina Bay Sands",
+                "type": "string"
+              }
+            },
+            {
+              "name": "limit",
+              "required": false,
+              "in": "query",
+              "description": "Maximum number of features to return.",
+              "schema": {
+                "type": "number"
+              }
+            },
+            {
+              "name": "lang",
+              "required": false,
+              "in": "query",
+              "description": "Preferred language for names, e.g. `en`.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "layer",
+              "required": false,
+              "in": "query",
+              "description": "Restrict results to given Photon layers, e.g. `house`, `street`, `city`.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/GeoJsonFeatureCollectionDto"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Missing or invalid `Authorization` header."
+            }
+          },
+          "security": [
+            {
+              "bearer": []
+            }
+          ],
+          "tags": [
+            "geocode"
+          ]
+        }
+      },
+      "/geocode/autocomplete": {
+        "get": {
+          "operationId": "GeocodeController_autocomplete",
+          "parameters": [
+            {
+              "name": "text",
+              "required": true,
+              "in": "query",
+              "description": "Free-text search string. Mapped onto Photon`s `q` param.",
+              "schema": {
+                "example": "Marina Bay Sands",
+                "type": "string"
+              }
+            },
+            {
+              "name": "limit",
+              "required": false,
+              "in": "query",
+              "description": "Maximum number of features to return.",
+              "schema": {
+                "type": "number"
+              }
+            },
+            {
+              "name": "lang",
+              "required": false,
+              "in": "query",
+              "description": "Preferred language for names, e.g. `en`.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "layer",
+              "required": false,
+              "in": "query",
+              "description": "Restrict results to given Photon layers, e.g. `house`, `street`, `city`.",
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/GeoJsonFeatureCollectionDto"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Missing or invalid `Authorization` header."
+            }
+          },
+          "security": [
+            {
+              "bearer": []
+            }
+          ],
+          "tags": [
+            "geocode"
+          ]
+        }
+      },
+      "/geocode/reverse": {
+        "get": {
+          "operationId": "GeocodeController_reverse",
+          "parameters": [
+            {
+              "name": "limit",
+              "required": false,
+              "in": "query",
+              "description": "Maximum number of features to return.",
+              "schema": {
+                "type": "number"
+              }
+            },
+            {
+              "name": "include",
+              "required": false,
+              "in": "query",
+              "description": "Restrict results to a category, e.g. `osm.amenity.fuel`.",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "radius",
+              "required": false,
+              "in": "query",
+              "description": "Search radius in kilometres.",
+              "schema": {
+                "type": "number"
+              }
+            },
+            {
+              "name": "lon",
+              "required": true,
+              "in": "query",
+              "description": "Longitude to resolve. `point.lon` is accepted as an alias.",
+              "schema": {
+                "example": 103.8607,
+                "type": "number"
+              }
+            },
+            {
+              "name": "lat",
+              "required": true,
+              "in": "query",
+              "description": "Latitude to resolve. `point.lat` is accepted as an alias.",
+              "schema": {
+                "example": 1.2834,
+                "type": "number"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/GeoJsonFeatureCollectionDto"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Missing or invalid `Authorization` header."
+            }
+          },
+          "security": [
+            {
+              "bearer": []
+            }
+          ],
+          "tags": [
+            "geocode"
+          ]
+        }
+      },
+      "/api/v1/users": {
+        "post": {
+          "operationId": "UsersController_createUser",
+          "parameters": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateUserDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "Users"
+          ]
+        },
+        "delete": {
+          "operationId": "UsersController_deactivateUsers",
+          "parameters": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeactivateUsersDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "Users"
+          ]
+        }
+      },
+      "/api/v1/users/reactivate": {
+        "patch": {
+          "operationId": "UsersController_reactivateUsers",
+          "parameters": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReactivateUsersDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "Users"
+          ]
+        }
+      },
+      "/api/v1/users/role": {
+        "patch": {
+          "operationId": "UsersController_updateUserRole",
+          "parameters": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateUserRoleDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "Users"
+          ]
+        }
+      },
+      "/api/v1/customers": {
+        "post": {
+          "operationId": "CustomersController_create",
+          "parameters": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpsertCustomerDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "customers"
+          ]
+        },
+        "get": {
+          "operationId": "CustomersController_list",
+          "parameters": [
+            {
+              "name": "pageSize",
+              "required": false,
+              "in": "query",
+              "schema": {
+                "type": "number"
+              }
+            },
+            {
+              "name": "page",
+              "required": false,
+              "in": "query",
+              "schema": {
+                "type": "number"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Paginated customer list"
+            }
+          },
+          "tags": [
+            "customers"
+          ]
+        }
+      },
+      "/api/v1/customers/{id}": {
+        "put": {
+          "operationId": "CustomersController_update",
+          "parameters": [
+            {
+              "name": "id",
+              "required": true,
+              "in": "path",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpsertCustomerDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "customers"
+          ]
+        },
+        "get": {
+          "operationId": "CustomersController_getOne",
+          "parameters": [
+            {
+              "name": "id",
+              "required": true,
+              "in": "path",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Single customer"
+            }
+          },
+          "tags": [
+            "customers"
+          ]
+        }
+      },
+      "/api/v1/customers/search": {
+        "get": {
+          "operationId": "CustomersController_search",
+          "parameters": [
+            {
+              "name": "q",
+              "required": true,
+              "in": "query",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Customer search results"
+            }
+          },
+          "tags": [
+            "customers"
+          ]
+        }
+      },
+      "/api/v1/customers/by-ids": {
+        "post": {
+          "operationId": "CustomersController_getByIds",
+          "parameters": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchByDbIdsDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Customers by DB IDs"
+            }
+          },
+          "tags": [
+            "customers"
+          ]
+        }
+      },
+      "/api/v1/customers/by-stripe-ids": {
+        "post": {
+          "operationId": "CustomersController_getByStripeIds",
+          "parameters": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BatchByStripeIdsDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "Customers by Stripe IDs"
+            }
+          },
+          "tags": [
+            "customers"
+          ]
+        }
+      },
+      "/api/v1/issuing/cards": {
+        "post": {
+          "operationId": "IssuingController_issueCard",
+          "parameters": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IssueCardDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "issuing"
+          ]
+        },
+        "get": {
+          "operationId": "IssuingController_listCards",
+          "parameters": [],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "issuing"
+          ]
+        }
+      },
+      "/api/v1/issuing/transactions": {
+        "get": {
+          "operationId": "IssuingController_listTransactions",
+          "parameters": [
+            {
+              "name": "driverId",
+              "required": true,
+              "in": "query",
+              "schema": {
+                "type": "string"
+              }
+            },
+            {
+              "name": "vehicleId",
+              "required": true,
+              "in": "query",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "issuing"
+          ]
+        }
+      },
+      "/api/v1/issuing/cards/{id}/status": {
+        "patch": {
+          "operationId": "IssuingController_setCardStatus",
+          "parameters": [
+            {
+              "name": "id",
+              "required": true,
+              "in": "path",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SetCardStatusDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "issuing"
+          ]
+        }
+      },
+      "/api/v1/issuing/cards/{id}/ephemeral-key": {
+        "post": {
+          "operationId": "IssuingController_createEphemeralKey",
+          "parameters": [
+            {
+              "name": "id",
+              "required": true,
+              "in": "path",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateEphemeralKeyDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "issuing"
+          ]
+        }
+      },
+      "/api/v1/connect/account-session": {
+        "post": {
+          "operationId": "ConnectController_createAccountSession",
+          "parameters": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateAccountSessionDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "connect"
+          ]
+        }
+      },
+      "/api/v1/connect/status": {
+        "get": {
+          "operationId": "ConnectController_getStatus",
+          "parameters": [],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "connect"
+          ]
+        }
+      },
+      "/api/v1/connect/issuing-statuses": {
+        "get": {
+          "operationId": "ConnectController_getIssuingStatuses",
+          "parameters": [],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "connect"
+          ]
+        }
+      },
+      "/api/v1/connect/funding-instructions": {
+        "post": {
+          "operationId": "ConnectController_getFundingInstructions",
+          "parameters": [],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "connect"
+          ]
+        }
+      },
+      "/api/v1/connect/issuing-balance": {
+        "get": {
+          "operationId": "ConnectController_getIssuingBalance",
+          "parameters": [],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "connect"
+          ]
+        }
+      },
+      "/api/v1/invitations": {
+        "post": {
+          "operationId": "InvitationsController_create",
+          "parameters": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateInvitationDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "Invitations"
+          ]
+        }
+      },
+      "/api/v1/invitations/pending": {
+        "get": {
+          "operationId": "InvitationsController_listPending",
+          "parameters": [],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "Invitations"
+          ]
+        }
+      },
+      "/api/v1/invitations/{id}/accept": {
+        "post": {
+          "operationId": "InvitationsController_accept",
+          "parameters": [
+            {
+              "name": "id",
+              "required": true,
+              "in": "path",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "Invitations"
+          ]
+        }
+      },
+      "/api/v1/invitations/{id}/decline": {
+        "post": {
+          "operationId": "InvitationsController_decline",
+          "parameters": [
+            {
+              "name": "id",
+              "required": true,
+              "in": "path",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "Invitations"
+          ]
+        }
+      },
+      "/api/v1/services": {
+        "post": {
+          "operationId": "ServicesController_create",
+          "parameters": [],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateServiceDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "services"
+          ]
+        }
+      },
+      "/api/v1/services/{id}": {
+        "patch": {
+          "operationId": "ServicesController_update",
+          "parameters": [
+            {
+              "name": "id",
+              "required": true,
+              "in": "path",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateServiceDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "services"
+          ]
+        },
+        "delete": {
+          "operationId": "ServicesController_remove",
+          "parameters": [
+            {
+              "name": "id",
+              "required": true,
+              "in": "path",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "services"
+          ]
+        }
+      },
+      "/api/v1/services/{id}/addons": {
+        "post": {
+          "operationId": "ServicesController_addAddon",
+          "parameters": [
+            {
+              "name": "id",
+              "required": true,
+              "in": "path",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CreateAddonDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "services"
+          ]
+        }
+      },
+      "/api/v1/services/addons/{addonId}": {
+        "patch": {
+          "operationId": "ServicesController_updateAddon",
+          "parameters": [
+            {
+              "name": "addonId",
+              "required": true,
+              "in": "path",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UpdateAddonDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "services"
+          ]
+        },
+        "delete": {
+          "operationId": "ServicesController_removeAddon",
+          "parameters": [
+            {
+              "name": "addonId",
+              "required": true,
+              "in": "path",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "services"
+          ]
+        }
+      },
+      "/api/v1/services/catalog": {
+        "get": {
+          "operationId": "ServicesPublicController_catalog",
+          "parameters": [
+            {
+              "name": "x-org-slug",
+              "required": true,
+              "in": "header",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "services"
+          ]
+        }
+      },
+      "/api/v1/services/quote": {
+        "post": {
+          "operationId": "ServicesPublicController_quote",
+          "parameters": [
+            {
+              "name": "x-org-slug",
+              "required": true,
+              "in": "header",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QuoteBookingDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "services"
+          ]
+        }
+      },
+      "/api/v1/services/pay": {
+        "post": {
+          "operationId": "ServicesPublicController_pay",
+          "parameters": [
+            {
+              "name": "x-org-slug",
+              "required": true,
+              "in": "header",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PayBookingDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": ""
+            }
+          },
+          "tags": [
+            "services"
+          ]
+        }
+      },
+      "/api/v1/routing/route": {
+        "post": {
+          "operationId": "RoutingController_route",
+          "parameters": [
+            {
+              "name": "x-org-slug",
+              "required": true,
+              "in": "header",
+              "description": "Slug of the active organisation.",
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RouteRequestDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/RoutePreviewDto"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Unknown or missing organisation."
+            }
+          },
+          "tags": [
+            "routing"
+          ]
+        }
+      },
+      "/api/v1/optimisation/run": {
+        "post": {
+          "operationId": "OptimisationController_run",
+          "parameters": [
+            {
+              "name": "X-Organisation-Slug",
+              "in": "header",
+              "description": "Slug of the organisation the request acts on.",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOptimisationDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "202": {
+              "description": "Optimisation queued",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/RunOptimisationResultDto"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Missing, malformed or expired bearer token."
+            },
+            "403": {
+              "description": "Unknown organisation, caller is not a member of it, or the required permission is missing."
+            },
+            "429": {
+              "description": "Rate limited (see nextAllowedAt)"
+            }
+          },
+          "security": [
+            {
+              "bearer": []
+            }
+          ],
+          "tags": [
+            "optimisation"
+          ]
+        }
+      },
+      "/api/v1/optimisation/run/latest": {
+        "get": {
+          "operationId": "OptimisationController_latest",
+          "parameters": [
+            {
+              "name": "X-Organisation-Slug",
+              "in": "header",
+              "description": "Slug of the organisation the request acts on.",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "responses": {
+            "200": {
+              "description": "Most recent run + next allowed time, or null if the organisation has never run an optimisation.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/LatestOptimisationRunDto"
+                  }
+                }
+              }
+            },
+            "401": {
+              "description": "Missing, malformed or expired bearer token."
+            },
+            "403": {
+              "description": "Unknown organisation, caller is not a member of it, or the required permission is missing."
+            }
+          },
+          "security": [
+            {
+              "bearer": []
+            }
+          ],
+          "tags": [
+            "optimisation"
+          ]
+        }
+      },
+      "/api/v1/optimisation/adhoc": {
+        "post": {
+          "operationId": "OptimisationController_adhoc",
+          "parameters": [
+            {
+              "name": "X-Organisation-Slug",
+              "in": "header",
+              "description": "Slug of the organisation the request acts on.",
+              "required": true,
+              "schema": {
+                "type": "string"
+              }
+            }
+          ],
+          "requestBody": {
+            "required": true,
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdhocOptimisationDto"
+                }
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": "Optimised route persisted and the routed packages claimed; returns the vrp_optimization id plus any packages VROOM could not fit.",
+              "content": {
+                "application/json": {
+                  "schema": {
+                    "$ref": "#/components/schemas/AdhocOptimisationResultDto"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "Unknown warehouse/driver/vehicle, driver and vehicle at different warehouses, or a package that is unknown, not at startingLocationId, or whose recipient has no location."
+            },
+            "401": {
+              "description": "Missing, malformed or expired bearer token."
+            },
+            "403": {
+              "description": "Unknown organisation, caller is not a member of it, or the required permission is missing."
+            },
+            "409": {
+              "description": "A package is already assigned to another optimisation."
+            }
+          },
+          "security": [
+            {
+              "bearer": []
+            }
+          ],
+          "tags": [
+            "optimisation"
+          ]
+        }
+      }
+    },
+    "info": {
+      "title": "Hikyaku Logistics API",
+      "description": "The Hikyaku Logistics API description",
+      "version": "1.0",
+      "contact": {}
+    },
+    "tags": [],
+    "servers": [],
+    "components": {
+      "securitySchemes": {
+        "bearer": {
+          "scheme": "bearer",
+          "bearerFormat": "JWT",
+          "type": "http"
+        }
+      },
+      "schemas": {
+        "GeoJsonPointDto": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "Point"
+              ],
+              "example": "Point"
+            },
+            "coordinates": {
+              "description": "Position as [lon, lat] — GeoJSON order, not [lat, lon].",
+              "example": [
+                103.85,
+                1.29
+              ],
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "coordinates"
+          ]
+        },
+        "GeoJsonFeaturePropertiesDto": {
+          "type": "object",
+          "properties": {
+            "osm_id": {
+              "type": "number",
+              "description": "OSM element id."
+            },
+            "osm_type": {
+              "type": "string",
+              "description": "OSM element type: N, W or R."
+            },
+            "osm_key": {
+              "type": "string",
+              "description": "OSM key, e.g. `place`, `amenity`."
+            },
+            "osm_value": {
+              "type": "string",
+              "description": "OSM value, e.g. `city`, `fuel`."
+            },
+            "name": {
+              "type": "string",
+              "description": "Primary display name of the result."
+            },
+            "housenumber": {
+              "type": "string"
+            },
+            "street": {
+              "type": "string"
+            },
+            "city": {
+              "type": "string"
+            },
+            "district": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "postcode": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            },
+            "countrycode": {
+              "type": "string",
+              "description": "ISO 3166-1 alpha-2 country code."
+            },
+            "extent": {
+              "description": "Bounding box as [minLon, minLat, maxLon, maxLat].",
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            }
+          }
+        },
+        "GeoJsonFeatureDto": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "Feature"
+              ],
+              "example": "Feature"
+            },
+            "geometry": {
+              "$ref": "#/components/schemas/GeoJsonPointDto"
+            },
+            "properties": {
+              "$ref": "#/components/schemas/GeoJsonFeaturePropertiesDto"
+            }
+          },
+          "required": [
+            "type",
+            "geometry",
+            "properties"
+          ]
+        },
+        "GeoJsonFeatureCollectionDto": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": [
+                "FeatureCollection"
+              ],
+              "example": "FeatureCollection"
+            },
+            "features": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/GeoJsonFeatureDto"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "features"
+          ]
+        },
+        "DriverMetadataDto": {
+          "type": "object",
+          "properties": {
+            "driver_license": {
+              "type": "string"
+            },
+            "license_expiry": {
+              "type": "string",
+              "description": "ISO 8601 date string, e.g. 2028-06-30"
+            },
+            "warehouse_id": {
+              "type": "string",
+              "description": "UUID of the warehouse the driver belongs to"
+            },
+            "country_of_issue": {
+              "type": "string"
+            },
+            "driver_under_probation": {
+              "type": "boolean"
+            },
+            "license_type": {
+              "type": "string",
+              "description": "UUID FK to vehicle_type.id (the driver license class)"
+            }
+          }
+        },
+        "CreateUserDto": {
+          "type": "object",
+          "properties": {
+            "user_email": {
+              "type": "string"
+            },
+            "user_display_name": {
+              "type": "string"
+            },
+            "user_phone_number": {
+              "type": "string"
+            },
+            "user_role": {
+              "type": "string",
+              "description": "Role name, must match an existing app_roles.name"
+            },
+            "user_permission": {
+              "description": "Array of app_permission.permission strings",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "user_metadata": {
+              "description": "Required when user_role is \"Driver\"",
+              "allOf": [
+                {
+                  "$ref": "#/components/schemas/DriverMetadataDto"
+                }
+              ]
+            },
+            "user_avatar": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "user_email",
+            "user_display_name",
+            "user_phone_number",
+            "user_role"
+          ]
+        },
+        "DeactivateUsersDto": {
+          "type": "object",
+          "properties": {}
+        },
+        "ReactivateUsersDto": {
+          "type": "object",
+          "properties": {}
+        },
+        "UpdateUserRoleDto": {
+          "type": "object",
+          "properties": {}
+        },
+        "CustomerAddressDto": {
+          "type": "object",
+          "properties": {
+            "street": {
+              "type": "string"
+            },
+            "suburb": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "postcode": {
+              "type": "string"
+            },
+            "country": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "street",
+            "suburb",
+            "state",
+            "postcode",
+            "country"
+          ]
+        },
+        "UpsertCustomerDto": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "phone": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "address": {
+              "$ref": "#/components/schemas/CustomerAddressDto"
+            },
+            "lat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "lon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            },
+            "confidence": {
+              "type": "number",
+              "description": "Pelias geocode confidence (0–1)"
+            },
+            "peliasGid": {
+              "type": "string",
+              "description": "Pelias global id for stable re-lookup"
+            },
+            "peliasRaw": {
+              "type": "object",
+              "description": "Raw Pelias feature (stored as jsonb)"
+            }
+          },
+          "required": [
+            "name",
+            "phone",
+            "address",
+            "lat",
+            "lon"
+          ]
+        },
+        "BatchByDbIdsDto": {
+          "type": "object",
+          "properties": {
+            "ids": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "ids"
+          ]
+        },
+        "BatchByStripeIdsDto": {
+          "type": "object",
+          "properties": {
+            "stripeIds": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "stripeIds"
+          ]
+        },
+        "IssueCardDto": {
+          "type": "object",
+          "properties": {
+            "driverId": {
+              "type": "string",
+              "description": "Driver (user) id to issue the card to"
+            },
+            "vehicleId": {
+              "type": "string",
+              "description": "Vehicle to associate the card with"
+            },
+            "spendingLimitMajor": {
+              "type": "number",
+              "description": "Major-unit spend cap, e.g. 150 for $150.00. Omit for no card-level limit."
+            },
+            "interval": {
+              "type": "string",
+              "enum": [
+                "per_authorization",
+                "daily",
+                "weekly",
+                "monthly",
+                "yearly",
+                "all_time"
+              ],
+              "default": "daily"
+            },
+            "currency": {
+              "type": "string",
+              "description": "ISO currency matching the platform Stripe account (usd/eur/gbp)"
+            }
+          },
+          "required": [
+            "driverId",
+            "currency"
+          ]
+        },
+        "SetCardStatusDto": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "type": "string",
+              "enum": [
+                "active",
+                "inactive",
+                "canceled"
+              ],
+              "description": "'inactive' freezes the card; 'canceled' is permanent."
+            }
+          },
+          "required": [
+            "status"
+          ]
+        },
+        "CreateEphemeralKeyDto": {
+          "type": "object",
+          "properties": {
+            "nonce": {
+              "type": "string",
+              "description": "Single-use nonce from stripe.createEphemeralKeyNonce()"
+            },
+            "apiVersion": {
+              "type": "string",
+              "description": "Stripe API version pinned by the client SDK"
+            }
+          },
+          "required": [
+            "nonce",
+            "apiVersion"
+          ]
+        },
+        "CreateAccountSessionDto": {
+          "type": "object",
+          "properties": {
+            "country": {
+              "type": "string",
+              "description": "ISO 3166-1 alpha-2 country, e.g. \"US\""
+            }
+          },
+          "required": [
+            "country"
+          ]
+        },
+        "CreateInvitationDto": {
+          "type": "object",
+          "properties": {
+            "user_email": {
+              "type": "string"
+            },
+            "org_id": {
+              "type": "string",
+              "description": "Must match the X-Organisation-Slug org id"
+            },
+            "role": {
+              "type": "string",
+              "description": "Role name, must match an existing app_roles.name"
+            },
+            "permissions": {
+              "description": "Array of app_permission.permission strings",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "user_email",
+            "org_id",
+            "role",
+            "permissions"
+          ]
+        },
+        "CreateServiceDto": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "amountMajor": {
+              "type": "number",
+              "description": "Per-unit rate in major units (e.g. dollars)."
+            },
+            "pricingUnit": {
+              "type": "string",
+              "enum": [
+                "per_delivery",
+                "per_km",
+                "per_mi",
+                "per_kg",
+                "per_lb",
+                "per_recipient"
+              ]
+            },
+            "currency": {
+              "type": "string",
+              "description": "ISO currency code; defaults to the account default."
+            }
+          },
+          "required": [
+            "name",
+            "amountMajor",
+            "pricingUnit"
+          ]
+        },
+        "UpdateServiceDto": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "amountMajor": {
+              "type": "number",
+              "description": "Per-unit rate in major units (e.g. dollars)."
+            },
+            "pricingUnit": {
+              "type": "string",
+              "enum": [
+                "per_delivery",
+                "per_km",
+                "per_mi",
+                "per_kg",
+                "per_lb",
+                "per_recipient"
+              ]
+            }
+          }
+        },
+        "CreateAddonDto": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "amountMajor": {
+              "type": "number",
+              "description": "Per-unit rate in major units (e.g. dollars)."
+            },
+            "pricingUnit": {
+              "type": "string",
+              "enum": [
+                "per_delivery",
+                "per_km",
+                "per_mi",
+                "per_kg",
+                "per_lb",
+                "per_recipient"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "amountMajor",
+            "pricingUnit"
+          ]
+        },
+        "UpdateAddonDto": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "amountMajor": {
+              "type": "number",
+              "description": "Per-unit rate in major units (e.g. dollars)."
+            },
+            "pricingUnit": {
+              "type": "string",
+              "enum": [
+                "per_delivery",
+                "per_km",
+                "per_mi",
+                "per_kg",
+                "per_lb",
+                "per_recipient"
+              ]
+            }
+          }
+        },
+        "AddressDto": {
+          "type": "object",
+          "properties": {
+            "country": {
+              "type": "string"
+            },
+            "state": {
+              "type": "string"
+            },
+            "suburb": {
+              "type": "string"
+            },
+            "street": {
+              "type": "string"
+            },
+            "lat": {
+              "type": "number",
+              "minimum": -90,
+              "maximum": 90
+            },
+            "lon": {
+              "type": "number",
+              "minimum": -180,
+              "maximum": 180
+            }
+          },
+          "required": [
+            "country",
+            "state",
+            "suburb",
+            "street",
+            "lat",
+            "lon"
+          ]
+        },
+        "ParcelDto": {
+          "type": "object",
+          "properties": {
+            "weight": {
+              "type": "number",
+              "minimum": 0
+            },
+            "height": {
+              "type": "number",
+              "minimum": 0
+            },
+            "width": {
+              "type": "number",
+              "minimum": 0
+            },
+            "length": {
+              "type": "number",
+              "minimum": 0
+            }
+          },
+          "required": [
+            "weight",
+            "height",
+            "width",
+            "length"
+          ]
+        },
+        "SenderDto": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "phoneNumber": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "address": {
+              "$ref": "#/components/schemas/AddressDto"
+            },
+            "parcel": {
+              "$ref": "#/components/schemas/ParcelDto"
+            },
+            "collectionDate": {
+              "type": "string",
+              "example": "2025-01-01",
+              "description": "ISO date YYYY-MM-DD"
+            }
+          },
+          "required": [
+            "name",
+            "phoneNumber",
+            "email",
+            "address",
+            "parcel",
+            "collectionDate"
+          ]
+        },
+        "ReceiverDto": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "phoneNumber": {
+              "type": "string"
+            },
+            "email": {
+              "type": "string"
+            },
+            "address": {
+              "$ref": "#/components/schemas/AddressDto"
+            },
+            "deliveryDate": {
+              "type": "string",
+              "example": "2025-01-03",
+              "description": "ISO date YYYY-MM-DD"
+            }
+          },
+          "required": [
+            "name",
+            "phoneNumber",
+            "email",
+            "address",
+            "deliveryDate"
+          ]
+        },
+        "QuoteBookingDto": {
+          "type": "object",
+          "properties": {
+            "serviceId": {
+              "type": "string",
+              "description": "UUID of the chosen service."
+            },
+            "addonIds": {
+              "description": "Selected add-on UUIDs.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sender": {
+              "$ref": "#/components/schemas/SenderDto"
+            },
+            "receiver": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ReceiverDto"
+              }
+            }
+          },
+          "required": [
+            "serviceId",
+            "sender",
+            "receiver"
+          ]
+        },
+        "PayBookingDto": {
+          "type": "object",
+          "properties": {
+            "serviceId": {
+              "type": "string",
+              "description": "UUID of the chosen service."
+            },
+            "addonIds": {
+              "description": "Selected add-on UUIDs.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "sender": {
+              "$ref": "#/components/schemas/SenderDto"
+            },
+            "receiver": {
+              "minItems": 1,
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/ReceiverDto"
+              }
+            },
+            "deliveryNotes": {
+              "type": "string",
+              "description": "Free-text notes shown to the driver."
+            }
+          },
+          "required": [
+            "serviceId",
+            "sender",
+            "receiver"
+          ]
+        },
+        "RouteRequestDto": {
+          "type": "object",
+          "properties": {
+            "profile": {
+              "type": "string",
+              "description": "ORS-style vehicle profile, e.g. 'driving-car'."
+            },
+            "coordinates": {
+              "type": "array",
+              "description": "Stops to route through, as [lng, lat] pairs in visit order.",
+              "minItems": 2,
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "example": [
+                [
+                  103.85,
+                  1.29
+                ],
+                [
+                  103.86,
+                  1.3
+                ]
+              ]
+            }
+          },
+          "required": [
+            "profile",
+            "coordinates"
+          ]
+        },
+        "RouteLegDto": {
+          "type": "object",
+          "properties": {
+            "duration": {
+              "type": "number",
+              "description": "Travel time in seconds."
+            },
+            "distance": {
+              "type": "number",
+              "description": "Distance in meters."
+            }
+          },
+          "required": [
+            "duration",
+            "distance"
+          ]
+        },
+        "RouteSummaryDto": {
+          "type": "object",
+          "properties": {
+            "duration": {
+              "type": "number",
+              "description": "Total travel time in seconds."
+            },
+            "distance": {
+              "type": "number",
+              "description": "Total distance in meters."
+            }
+          },
+          "required": [
+            "duration",
+            "distance"
+          ]
+        },
+        "RoutePreviewDto": {
+          "type": "object",
+          "properties": {
+            "coordinates": {
+              "type": "array",
+              "description": "Whole-route path as [lng, lat] pairs, legs concatenated with shared boundary points de-duplicated.",
+              "items": {
+                "type": "array",
+                "minItems": 2,
+                "maxItems": 2,
+                "items": {
+                  "type": "number"
+                }
+              },
+              "example": [
+                [
+                  103.85,
+                  1.29
+                ],
+                [
+                  103.8555,
+                  1.2945
+                ],
+                [
+                  103.86,
+                  1.3
+                ]
+              ]
+            },
+            "wayPoints": {
+              "description": "Index into `coordinates` of each stop. wayPoints[0] is 0 and the last entry is coordinates.length - 1.",
+              "example": [
+                0,
+                2
+              ],
+              "type": "array",
+              "items": {
+                "type": "number"
+              }
+            },
+            "legs": {
+              "description": "Per stop-pair legs — n stops yield n-1 legs.",
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/RouteLegDto"
+              }
+            },
+            "summary": {
+              "$ref": "#/components/schemas/RouteSummaryDto"
+            }
+          },
+          "required": [
+            "coordinates",
+            "wayPoints",
+            "legs",
+            "summary"
+          ]
+        },
+        "SetOffOverrideDto": {
+          "type": "object",
+          "properties": {
+            "vehicleId": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "setOffAt": {
+              "type": "string",
+              "description": "ISO timestamp the vehicle should set off."
+            }
+          },
+          "required": [
+            "vehicleId",
+            "setOffAt"
+          ]
+        },
+        "RunOptimisationDto": {
+          "type": "object",
+          "properties": {
+            "warehouseId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "Warehouse to optimise."
+            },
+            "setOffOverrides": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/SetOffOverrideDto"
+              }
+            }
+          },
+          "required": [
+            "warehouseId"
+          ]
+        },
+        "RunOptimisationResultDto": {
+          "type": "object",
+          "properties": {
+            "runId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "optimisation_run.id of the queued run."
+            },
+            "status": {
+              "type": "string",
+              "enum": [
+                "queued"
+              ],
+              "example": "queued"
+            }
+          },
+          "required": [
+            "runId",
+            "status"
+          ]
+        },
+        "LatestOptimisationRunDto": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "status": {
+              "type": "string",
+              "description": "Run lifecycle state, e.g. `queued`, `failed`, `skipped`."
+            },
+            "requestedAt": {
+              "type": "string",
+              "format": "date-time",
+              "description": "When the run was requested."
+            },
+            "optimisationId": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true,
+              "description": "vrp_optimization.id once the run has produced one."
+            },
+            "error": {
+              "type": "string",
+              "nullable": true,
+              "description": "Failure detail when status is `failed`."
+            },
+            "nextAllowedAt": {
+              "type": "string",
+              "format": "date-time",
+              "nullable": true,
+              "description": "Earliest time another run is allowed. Null when this run does not count toward the rate limit (failed or skipped)."
+            }
+          },
+          "required": [
+            "id",
+            "status",
+            "requestedAt",
+            "optimisationId",
+            "error"
+          ]
+        },
+        "AdhocOptimisationDto": {
+          "type": "object",
+          "properties": {
+            "startDateTime": {
+              "type": "string",
+              "description": "ISO-8601 timestamp the vehicle sets off."
+            },
+            "startingLocationId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "warehouse.id — the start/end location."
+            },
+            "driverId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "drivers.id — the driver this shift is assigned to. Must share a warehouse with vehicleId."
+            },
+            "vehicleId": {
+              "type": "string",
+              "format": "uuid",
+              "description": "vehicles.id — the vehicle this shift is assigned to; also resolves the routing profile via vehicles.vehicle_type. Must share a warehouse with driverId."
+            },
+            "packages": {
+              "description": "Existing packages.id values to deliver on this shift. Each must sit at startingLocationId and not already belong to another optimisation.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          "required": [
+            "startDateTime",
+            "startingLocationId",
+            "driverId",
+            "vehicleId",
+            "packages"
+          ]
+        },
+        "AdhocOptimisationResultDto": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid",
+              "description": "vrp_optimization.id of the persisted optimisation."
+            },
+            "routeId": {
+              "type": "string",
+              "format": "uuid",
+              "nullable": true,
+              "description": "vrp_route.id of the single routed vehicle, or null when VROOM produced no route."
+            },
+            "unassignedPackageIds": {
+              "description": "Requested packages VROOM could not fit into the shift. Empty when every package was assigned.",
+              "type": "array",
+              "items": {
+                "type": "string",
+                "format": "uuid"
+              }
+            }
+          },
+          "required": [
+            "id",
+            "routeId",
+            "unassignedPackageIds"
+          ]
+        }
+      }
+    }
+  }

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Matches DarkBackground in the Compose theme (org.hikyaku.mobile.theme.Color). -->
+    <color name="window_background">#FF050505</color>
+</resources>

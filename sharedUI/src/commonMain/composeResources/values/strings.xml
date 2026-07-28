@@ -1,0 +1,339 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App -->
+    <string name="app_name">Hikyaku</string>
+
+    <!-- Common actions -->
+    <string name="action_back">Back</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_dismiss">Dismiss</string>
+    <string name="action_ok">OK</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_next">Next</string>
+    <string name="action_search">Search</string>
+    <string name="action_open_settings">Open settings</string>
+    <string name="action_share">Share</string>
+
+    <!-- Content descriptions -->
+    <string name="cd_profile_picture">Profile picture</string>
+    <string name="cd_country_selector">Country selector</string>
+    <string name="cd_package_photo">Package photo</string>
+    <string name="cd_open_navigation_menu">Open navigation menu</string>
+    <string name="cd_previous_month">Previous month</string>
+    <string name="cd_next_month">Next month</string>
+
+    <!-- Navigation drawer -->
+    <string name="nav_home">Home</string>
+    <string name="nav_packages">Packages</string>
+    <string name="nav_vehicles">Vehicles</string>
+
+    <!-- Account switcher -->
+    <string name="account_no_display_name">No display name</string>
+    <string name="account_switch_organisation">Switch organisation</string>
+    <string name="account_sign_out">Sign out</string>
+    <string name="account_default_badge">Default</string>
+    <string name="account_edit_name">Edit</string>
+    <string name="account_edit_name_title">Display name</string>
+    <string name="account_edit_name_save">Save</string>
+    <string name="account_error_update_name_failed">Couldn't update your display name.</string>
+    <string name="account_photo_option_camera">Take photo</string>
+    <string name="account_photo_option_gallery">Choose from gallery</string>
+    <string name="account_error_update_photo_failed">Couldn't update your profile picture.</string>
+
+    <!-- Home -->
+    <string name="home_no_shifts">No Shifts Found</string>
+    <string name="home_no_shifts_for_date">No shifts on this date.</string>
+    <string name="home_section_completed">Completed</string>
+    <string name="shift_badge_manual">Manual</string>
+    <string name="shift_badge_optimised">Optimised</string>
+    <string name="shift_deleted_snackbar">Shift deleted</string>
+    <string name="shift_error_delete_failed">Couldn't delete this shift.</string>
+    <string name="home_delete_blocked_title">Can't delete this shift</string>
+    <string name="home_delete_blocked_message">This shift already has delivered packages, so it can't be deleted.</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_undo">Undo</string>
+
+    <!-- Generic errors -->
+    <string name="error_load_organisations">Unable to load organisations.</string>
+    <string name="error_load_shifts">Unable to load shifts.</string>
+    <string name="error_load_routes">Unable to load routes.</string>
+    <string name="error_load_route">Unable to load this route.</string>
+    <string name="error_load_packages">Unable to load packages.</string>
+    <string name="error_load_package">Unable to load this package.</string>
+    <string name="error_load_vehicles">Unable to load vehicles.</string>
+
+    <!-- Auth -->
+    <string name="auth_sign_in">Sign In</string>
+    <string name="auth_sign_up">Sign Up</string>
+    <string name="auth_create_account_title">Create Account</string>
+    <string name="auth_label_email">Email</string>
+    <string name="auth_label_password">Password</string>
+    <string name="auth_label_display_name">Display Name</string>
+    <string name="auth_label_confirm_password">Confirm Password</string>
+    <string name="auth_forgot_password">Forgot Password?</string>
+    <string name="auth_show_password">Show password</string>
+    <string name="auth_hide_password">Hide password</string>
+    <string name="auth_error_missing_credentials">Please enter your email and password.</string>
+    <string name="auth_error_sign_in_failed">Invalid credentials.</string>
+    <string name="auth_error_missing_display_name">Please enter a display name.</string>
+    <string name="auth_error_missing_email">Please enter your email.</string>
+    <string name="auth_error_password_too_short">Password must be at least 6 characters.</string>
+    <string name="auth_error_passwords_mismatch">Passwords do not match.</string>
+    <string name="auth_error_sign_up_failed">Unable to sign up.</string>
+    <string name="auth_otp_title">Enter confirmation code</string>
+    <string name="auth_otp_description">We sent a 6-digit code to %1$s. Enter it below to confirm your account.</string>
+    <string name="auth_label_otp_code">Confirmation code</string>
+    <string name="auth_otp_verify">Verify</string>
+    <string name="auth_otp_resend">Resend code</string>
+    <string name="auth_info_otp_resent">A new code is on its way.</string>
+    <string name="auth_error_invalid_otp">Enter the 6-digit code from your email.</string>
+    <string name="auth_error_otp_failed">Invalid or expired code.</string>
+    <string name="auth_error_otp_resend_failed">Unable to resend code.</string>
+    <string name="auth_error_missing_email_for_reset">Enter your email above, then tap Forgot Password.</string>
+    <string name="auth_info_password_reset_sent">If an account exists for %1$s, a reset code is on its way.</string>
+    <string name="auth_error_password_reset_failed">Unable to send reset email.</string>
+    <string name="auth_otp_reset_title">Enter reset code</string>
+    <string name="auth_otp_reset_description">We sent a 6-digit code to %1$s. Enter it below to reset your password.</string>
+    <string name="auth_new_password_title">Set a new password</string>
+    <string name="auth_new_password_submit">Update Password</string>
+    <string name="auth_error_password_update_failed">Unable to update password.</string>
+
+    <!-- Welcome -->
+    <string name="welcome_self_hosted">Self-Hosted Hikyaku</string>
+
+    <!-- Environment -->
+    <string name="environment_choose_instance">Choose the instance to connect to.</string>
+    <string name="environment_connected_to">Connected to %1$s</string>
+    <string name="environment_label_instance_url">Instance URL</string>
+    <string name="environment_placeholder_url">https://hikyaku.org</string>
+    <string name="environment_connect">Connect</string>
+    <string name="environment_error_invalid_url">Enter a valid URL, e.g. https://hikyaku.org</string>
+    <string name="environment_error_unreachable">Couldn't reach the server. Check the URL and try again.</string>
+
+    <!-- Tracking share -->
+    <string name="tracking_share_text">Your delivery from %1$s is on its way. Track it here: %2$s</string>
+    <string name="tracking_url_copied">URL copied to clipboard</string>
+
+    <!-- Phone -->
+    <string name="phone_label_default">Phone</string>
+    <string name="phone_error_invalid">Enter a valid phone number</string>
+    <string name="phone_select_country_title">Select a country</string>
+
+    <!-- Shift detail -->
+    <string name="shift_detail_title">Shift</string>
+    <string name="shift_no_routes">This shift has no routes.</string>
+    <string name="shift_complete_banner">Shift complete — you're back at the warehouse.</string>
+    <string name="shift_all_delivered_banner">All stops delivered. Return to the warehouse to finish the shift.</string>
+    <string name="shift_permission_required_message">Background location ("Allow all the time") and notifications are required to keep tracking your shift in the background. Enable them in settings, then start the shift.</string>
+    <string name="shift_start_button">Start shift</string>
+    <string name="shift_no_packages">No packages on this route.</string>
+    <string name="shift_route_label">Route %1$d</string>
+    <string name="shift_unknown_recipient">Unknown recipient</string>
+    <string name="shift_trip_details_title">Trip details</string>
+    <string name="shift_trip_start">Start</string>
+    <string name="shift_trip_duration">Duration</string>
+    <string name="shift_trip_distance">Distance</string>
+    <string name="shift_trip_vehicle">Vehicle</string>
+    <string name="shift_edit">Edit</string>
+    <string name="shift_edit_done">Done</string>
+    <string name="shift_add_stop">Add stop</string>
+    <string name="shift_add_stop_no_packages">No unassigned packages available. Create one from the Packages tab first.</string>
+    <string name="shift_remove_stop">Remove stop</string>
+    <string name="shift_remove_stop_confirm_title">Remove stop?</string>
+    <string name="shift_remove_stop_confirm_message">This will remove %1$s from the shift.</string>
+    <string name="shift_stop_locked">On the van — can't remove</string>
+    <string name="shift_reschedule_title">Start time</string>
+    <string name="shift_reschedule_apply">Update start time</string>
+    <string name="shift_map_expand">Tap to expand</string>
+    <string name="shift_photo_added">Photo added ✓</string>
+    <string name="shift_add_photo">Add photo</string>
+    <string name="shift_mark_delivered">Mark delivered</string>
+    <string name="shift_navigate">Navigate</string>
+    <string name="shift_call_recipient">Call recipient</string>
+    <string name="poi_fuel_station">Fuel station</string>
+    <string name="poi_bicycle_parking">Bicycle parking</string>
+    <string name="shift_error_start_failed">Couldn't start the shift</string>
+    <string name="shift_error_photo_upload_failed">Photo upload failed.</string>
+    <string name="shift_error_advance_failed">Couldn't advance to the next stop.</string>
+    <string name="shift_error_mark_delivered_failed">Couldn't mark this stop delivered</string>
+    <string name="shift_scan_packages_button">Scan packages (%1$d of %2$d)</string>
+    <string name="shift_scan_title">Scan packages</string>
+    <string name="shift_scan_progress">%1$d of %2$d scanned</string>
+    <string name="shift_scan_instruction">Scan every package's QR code as you load it. Order doesn't matter.</string>
+    <string name="shift_scan_remaining_title">Still to scan</string>
+    <string name="shift_scan_flashlight">Torch</string>
+    <string name="shift_scan_accepted">%1$s added</string>
+    <string name="shift_scan_already">%1$s is already scanned.</string>
+    <string name="shift_scan_not_on_shift">%1$s isn't on this shift.</string>
+    <string name="shift_scan_unrecognised">That code isn't a package label.</string>
+    <string name="shift_scan_not_ready">Still loading this route's packages — try again in a moment.</string>
+    <string name="shift_scan_failed">Couldn't record %1$s.</string>
+    <string name="shift_scan_refresh_failed">Couldn't refresh scan progress.</string>
+    <string name="shift_scan_manual_title">Can't scan the label?</string>
+    <string name="shift_scan_manual_label">Tracking number</string>
+    <string name="shift_scan_manual_submit">Add</string>
+    <string name="shift_scan_camera_permission">Camera access is needed to scan package labels.</string>
+    <string name="shift_scan_camera_unavailable">Camera scanning isn't available on this device. Enter tracking numbers manually.</string>
+    <string name="shift_scan_gate_banner">Scan every package before starting the shift.</string>
+    <string name="cd_shift_scan_close">Close scanner</string>
+
+    <!-- Create shift -->
+    <string name="create_shift_title">New shift</string>
+    <string name="create_shift_submit">Create &amp; optimise</string>
+    <string name="create_shift_step_details">Details</string>
+    <string name="create_shift_step_packages">Packages</string>
+    <string name="create_shift_step_review">Review</string>
+    <string name="create_shift_section_vehicle_type">Vehicle</string>
+    <string name="create_shift_no_vehicles_title">No vehicles yet</string>
+    <string name="create_shift_no_vehicles_body">Add a vehicle to your fleet before creating a shift.</string>
+    <string name="create_shift_add_vehicle_cta">Add a vehicle</string>
+    <string name="create_shift_section_start_datetime">Start date &amp; time</string>
+    <string name="create_shift_pick_date">Pick date</string>
+    <string name="create_shift_section_starting_location">Starting location (warehouse)</string>
+    <string name="create_shift_add_new_location">+ Add a new starting location</string>
+    <string name="create_shift_label_location_name">Name (e.g. Home)</string>
+    <string name="create_shift_label_search_address">Search address</string>
+    <string name="create_shift_use_saved_location">Use a saved location instead</string>
+    <string name="create_shift_label_address">Address</string>
+    <string name="address_autocomplete_no_results">No address found</string>
+    <string name="create_shift_no_packages_available">No unassigned packages at this location yet. Create one below.</string>
+    <string name="create_shift_add_new_package">+ Create a new package</string>
+    <string name="create_shift_delivery_by">Delivery by %1$s:%2$s</string>
+    <string name="create_shift_delivery_time_suffix">  ·  by %1$s:%2$s</string>
+    <string name="create_shift_delivery_time_optional">Delivery time (optional)</string>
+    <string name="create_shift_review_vehicle">Vehicle</string>
+    <string name="create_shift_review_start">Start</string>
+    <string name="create_shift_review_from">From</string>
+    <string name="create_shift_review_stops">Packages</string>
+    <string name="create_shift_label_name">Name</string>
+    <string name="create_shift_error_load_vehicle_types">Couldn't load vehicles.</string>
+    <string name="create_shift_error_choose_vehicle">Choose a vehicle.</string>
+    <string name="create_shift_error_choose_date">Choose a start date.</string>
+    <string name="create_shift_error_choose_location">Search and select a starting location.</string>
+    <string name="create_shift_error_name_location">Name your starting location.</string>
+    <string name="create_shift_error_choose_saved_location">Choose a starting location.</string>
+    <string name="create_shift_error_no_packages">Select or create at least one package.</string>
+    <string name="create_shift_error_save_location_failed">Couldn't save the starting location.</string>
+    <string name="create_shift_error_submit_failed">Couldn't create the shift.</string>
+    <string name="create_shift_error_package_conflict">One or more selected packages were already used in another shift. Review your selection and try again.</string>
+
+    <!-- Package overview -->
+    <string name="package_overview_title">Packages</string>
+    <string name="package_no_packages">No packages yet.</string>
+    <string name="package_detail_title">Package</string>
+    <string name="cd_package_qr_code">Package QR code</string>
+    <string name="package_detail_created">Created %1$s</string>
+    <string name="package_detail_print_label">Print shipping label</string>
+    <string name="package_detail_status_unknown">No status yet</string>
+    <string name="package_detail_section_journey">Journey</string>
+    <string name="package_detail_from">From</string>
+    <string name="package_detail_to">To</string>
+    <string name="package_detail_no_name">Unknown</string>
+    <string name="package_detail_no_address">No address on file</string>
+    <string name="package_detail_section_dimensions">Dimensions</string>
+    <string name="package_detail_label_weight">Weight</string>
+    <string name="package_detail_label_volume">Volume</string>
+    <string name="package_detail_label_size">Size (L×W×H)</string>
+    <string name="package_detail_weight_value">%1$s kg</string>
+    <string name="package_detail_volume_value">%1$s cm³</string>
+    <string name="package_detail_size_value">%1$s × %2$s × %3$s</string>
+    <string name="package_detail_dimensions_missing">No dimensions recorded.</string>
+    <string name="package_detail_section_schedule">Delivery window</string>
+    <string name="package_detail_scheduled_departure">Scheduled departure</string>
+    <string name="package_detail_actual_departure">Actual departure</string>
+    <string name="package_detail_scheduled_arrival">Scheduled arrival</string>
+    <string name="package_detail_actual_arrival">Actual arrival</string>
+    <string name="package_detail_pending">Pending</string>
+    <string name="package_detail_section_origin">Origin warehouse</string>
+    <string name="package_detail_section_notes">Delivery notes</string>
+    <string name="package_detail_section_timeline">Status history</string>
+    <string name="package_detail_no_timeline">No status updates yet.</string>
+    <string name="package_detail_section_pod">Proof of delivery</string>
+
+    <!-- Add package -->
+    <string name="package_add_title">Add Package</string>
+    <string name="package_section_dimensions">Dimensions</string>
+    <string name="package_label_weight">Weight (kg)</string>
+    <string name="package_label_length">Length (cm)</string>
+    <string name="package_label_width">Width (cm)</string>
+    <string name="package_label_height">Height (cm)</string>
+    <string name="package_section_images">Photos (optional)</string>
+    <string name="package_action_take_photo">Camera</string>
+    <string name="package_action_choose_photos">Choose photos</string>
+    <string name="package_section_sender">Sender</string>
+    <string name="package_section_receiver">Receiver</string>
+    <string name="package_label_delivery_notes">Delivery notes</string>
+    <string name="package_section_warehouse">Starting warehouse</string>
+    <string name="package_section_arrival">Scheduled arrival</string>
+    <string name="package_submit">Create Package</string>
+    <string name="package_error_invalid_weight">Enter a valid weight.</string>
+    <string name="package_error_invalid_dimensions">Enter valid dimensions.</string>
+    <string name="package_error_sender_needs_name">Enter the sender's name.</string>
+    <string name="package_error_sender_needs_phone">Enter a valid sender phone number.</string>
+    <string name="package_error_sender_needs_address">Search and select the sender's address.</string>
+    <string name="package_error_receiver_needs_name">Enter the receiver's name.</string>
+    <string name="package_error_receiver_needs_phone">Enter a valid receiver phone number.</string>
+    <string name="package_error_receiver_needs_address">Search and select the receiver's address.</string>
+    <string name="package_error_choose_warehouse">Search and select a starting warehouse.</string>
+    <string name="package_error_name_warehouse">Name this warehouse.</string>
+    <string name="package_error_choose_saved_warehouse">Choose a starting warehouse.</string>
+    <string name="package_error_choose_arrival">Choose a scheduled arrival date and time.</string>
+    <string name="package_error_save_warehouse_failed">Couldn't save the warehouse.</string>
+    <string name="package_error_submit_failed">Couldn't create the package.</string>
+
+    <!-- Vehicle overview -->
+    <string name="vehicle_overview_title">Vehicles</string>
+    <string name="vehicle_no_vehicles">No vehicles yet.</string>
+
+    <!-- Add vehicle -->
+    <string name="vehicle_add_title">Add Vehicle</string>
+    <string name="vehicle_label_model">Model</string>
+    <string name="vehicle_label_make">Make</string>
+    <string name="vehicle_label_plate">Plate</string>
+    <string name="vehicle_label_vin">VIN</string>
+    <string name="vehicle_label_year">Year</string>
+    <string name="vehicle_label_gross_limits">Gross weight limit (kg)</string>
+    <string name="vehicle_section_type">Vehicle type</string>
+    <string name="vehicle_section_warehouse">Home warehouse</string>
+    <string name="vehicle_section_photos">Photos (optional)</string>
+    <string name="vehicle_action_take_photo">Camera</string>
+    <string name="vehicle_action_choose_photos">Choose photos</string>
+    <string name="cd_vehicle_photo">Vehicle photo</string>
+    <string name="vehicle_submit">Add Vehicle</string>
+    <string name="vehicle_error_invalid_year">Enter a valid year.</string>
+    <string name="vehicle_error_invalid_gross_limits">Enter a valid gross weight limit.</string>
+    <string name="vehicle_error_choose_type">Choose a vehicle type.</string>
+    <string name="vehicle_error_choose_warehouse">Choose a home warehouse.</string>
+    <string name="vehicle_error_submit_failed">Couldn't create the vehicle.</string>
+
+    <!-- Vehicle detail -->
+    <string name="vehicle_detail_title">Vehicle</string>
+    <string name="vehicle_detail_section_maintenance">Maintenance history</string>
+    <string name="vehicle_detail_no_maintenance">No maintenance records yet.</string>
+    <string name="vehicle_detail_odometer_value">%1$s km</string>
+    <string name="cd_maintenance_photo">Maintenance photo</string>
+    <string name="vehicle_detail_label_plate">Plate: %1$s</string>
+    <string name="vehicle_detail_label_vin">VIN: %1$s</string>
+    <string name="vehicle_detail_label_year">Year: %1$s</string>
+    <string name="vehicle_detail_label_gross_limit">Gross limit: %1$s kg</string>
+    <string name="vehicle_detail_label_warehouse">Warehouse: %1$s</string>
+    <string name="error_load_vehicle">Unable to load this vehicle.</string>
+    <string name="error_load_maintenance">Unable to load maintenance records.</string>
+
+    <!-- Add maintenance record -->
+    <string name="maintenance_add_title">Add Maintenance Record</string>
+    <string name="maintenance_label_odometer">Odometer (km)</string>
+    <string name="maintenance_label_description">Description</string>
+    <string name="maintenance_section_date_serviced">Date serviced</string>
+    <string name="maintenance_date_placeholder">Select a date</string>
+    <string name="maintenance_section_photos">Photos (optional)</string>
+    <string name="maintenance_action_take_photo">Camera</string>
+    <string name="maintenance_action_choose_photos">Choose photos</string>
+    <string name="maintenance_submit">Add Record</string>
+    <string name="maintenance_error_invalid_odometer">Enter a valid odometer reading.</string>
+    <string name="maintenance_error_missing_description">Enter a description.</string>
+    <string name="maintenance_error_choose_date">Choose the date serviced.</string>
+    <string name="maintenance_error_submit_failed">Couldn't save the maintenance record.</string>
+</resources>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      App window theme. The window background uses a DayNight colour (values vs
+      values-night) so the area behind the transparent system bars matches the
+      Compose app background instead of showing a white window background. Status
+      bar icon appearance is driven by enableEdgeToEdge() in MainActivity.
+    -->
+    <style name="Theme.Hikyaku" parent="@android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+    </style>
+</resources>
