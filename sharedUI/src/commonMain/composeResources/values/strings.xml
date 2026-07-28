@@ -15,6 +15,8 @@
     <string name="action_search">Search</string>
     <string name="action_open_settings">Open settings</string>
     <string name="action_share">Share</string>
+    <string name="action_continue">Continue</string>
+    <string name="action_not_now">Not now</string>
 
     <!-- Content descriptions -->
     <string name="cd_profile_picture">Profile picture</string>
@@ -128,6 +130,11 @@
     <string name="shift_all_delivered_banner">All stops delivered. Return to the warehouse to finish the shift.</string>
     <string name="shift_permission_required_message">Background location ("Allow all the time") and notifications are required to keep tracking your shift in the background. Enable them in settings, then start the shift.</string>
     <string name="shift_start_button">Start shift</string>
+    <string name="shift_start_permission_title">Allow location &amp; notifications</string>
+    <string name="shift_start_permission_intro">Starting a shift needs a couple of permissions so tracking keeps working even when the app is in the background:</string>
+    <string name="shift_start_permission_location_reason">Background location — powers live tracking so customers can see your delivery, and lets the shift resume automatically if the app closes.</string>
+    <string name="shift_start_permission_notifications_reason">Notifications — keeps you informed about the shift and tracking status while you drive.</string>
+    <string name="shift_start_permission_footnote">Location is only tracked while a shift is active.</string>
     <string name="shift_no_packages">No packages on this route.</string>
     <string name="shift_route_label">Route %1$d</string>
     <string name="shift_unknown_recipient">Unknown recipient</string>

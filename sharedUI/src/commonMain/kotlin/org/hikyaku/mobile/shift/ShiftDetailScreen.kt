@@ -37,7 +37,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -114,7 +116,9 @@ import org.hikyaku.mobile.util.isoDateToEpochMillisUtc
 import hikyaku.sharedui.generated.resources.Res
 import hikyaku.sharedui.generated.resources.action_back
 import hikyaku.sharedui.generated.resources.action_cancel
+import hikyaku.sharedui.generated.resources.action_continue
 import hikyaku.sharedui.generated.resources.action_dismiss
+import hikyaku.sharedui.generated.resources.action_not_now
 import hikyaku.sharedui.generated.resources.action_ok
 import hikyaku.sharedui.generated.resources.action_open_settings
 import hikyaku.sharedui.generated.resources.action_remove
@@ -152,6 +156,11 @@ import hikyaku.sharedui.generated.resources.shift_route_label
 import hikyaku.sharedui.generated.resources.shift_scan_gate_banner
 import hikyaku.sharedui.generated.resources.shift_scan_packages_button
 import hikyaku.sharedui.generated.resources.shift_start_button
+import hikyaku.sharedui.generated.resources.shift_start_permission_footnote
+import hikyaku.sharedui.generated.resources.shift_start_permission_intro
+import hikyaku.sharedui.generated.resources.shift_start_permission_location_reason
+import hikyaku.sharedui.generated.resources.shift_start_permission_notifications_reason
+import hikyaku.sharedui.generated.resources.shift_start_permission_title
 import hikyaku.sharedui.generated.resources.shift_trip_details_title
 import hikyaku.sharedui.generated.resources.shift_trip_distance
 import hikyaku.sharedui.generated.resources.shift_trip_duration
@@ -329,7 +338,7 @@ private fun ShiftDetailScreenContent(
     // (and notifications) are granted; otherwise we surface a banner pointing the user to settings.
     var permissionDenied by remember { mutableStateOf(false) }
     val openSettings = rememberOpenAppSettings()
-    val startShift = rememberShiftPermissions { granted ->
+    val requestShiftPermissions = rememberShiftPermissions { granted ->
         permissionDenied = !granted
         if (granted) onStartShift()
     }
@@ -338,6 +347,14 @@ private fun ShiftDetailScreenContent(
     // window) and the watcher's permissions are already granted. armAutoStart() is idempotent, so
     // re-running this effect on state changes won't reset accumulated detection flags.
     val hasTrackingPermissions = rememberHasShiftTrackingPermissions()
+
+    // Requesting background location cold (no explanation) reads as suspicious and invites a denial,
+    // so when permissions aren't already granted, "Start shift" first shows why they're needed; only
+    // then does it trigger the real OS prompts via requestShiftPermissions.
+    var showPermissionRationale by remember { mutableStateOf(false) }
+    val startShift: () -> Unit = {
+        if (hasTrackingPermissions) requestShiftPermissions() else showPermissionRationale = true
+    }
     LaunchedEffect(state.autoStartEligible, state.shiftStarted, state.selectedRouteId, hasTrackingPermissions) {
         if (state.autoStartEligible && !state.shiftStarted && hasTrackingPermissions) {
             onArmAutoStart()
@@ -570,6 +587,16 @@ private fun ShiftDetailScreenContent(
 
     if (showFullMap) {
         FullScreenRouteMap(state = state, onDismiss = { showFullMap = false })
+    }
+
+    if (showPermissionRationale) {
+        StartShiftPermissionRationaleDialog(
+            onContinue = {
+                showPermissionRationale = false
+                requestShiftPermissions()
+            },
+            onDismiss = { showPermissionRationale = false },
+        )
     }
 
     state.addStop?.let { draft ->
@@ -880,6 +907,49 @@ private fun encodeUriComponent(value: String): String = buildString {
             append('%')
             append(c.toString(16).uppercase().padStart(2, '0'))
         }
+    }
+}
+
+/**
+ * Explains, before the OS permission prompts fire, why starting a shift needs background location
+ * and notifications. Shown once per "Start shift" tap while permissions aren't yet granted, so the
+ * driver isn't hit with an unexplained "Allow all the time" dialog. [onContinue] proceeds into the
+ * real (chained) OS permission requests; [onDismiss] backs out without requesting anything.
+ */
+@Composable
+private fun StartShiftPermissionRationaleDialog(onContinue: () -> Unit, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = { Icon(Icons.Filled.Place, contentDescription = null) },
+        title = { Text(stringResource(Res.string.shift_start_permission_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(stringResource(Res.string.shift_start_permission_intro))
+                PermissionReasonRow(Icons.Filled.Place, stringResource(Res.string.shift_start_permission_location_reason))
+                PermissionReasonRow(Icons.Filled.Notifications, stringResource(Res.string.shift_start_permission_notifications_reason))
+                Text(
+                    text = stringResource(Res.string.shift_start_permission_footnote),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = onContinue) { Text(stringResource(Res.string.action_continue)) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.action_not_now)) } },
+    )
+}
+
+/** A single icon + explanation line inside [StartShiftPermissionRationaleDialog]. */
+@Composable
+private fun PermissionReasonRow(icon: ImageVector, text: String) {
+    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
