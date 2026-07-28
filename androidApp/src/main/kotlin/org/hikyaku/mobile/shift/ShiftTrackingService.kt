@@ -1,5 +1,6 @@
 package org.hikyaku.mobile.shift
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
@@ -38,13 +39,18 @@ class ShiftTrackingService : Service() {
     private val sessionStore = ShiftSessionStore()
     private var collectJob: Job? = null
 
+    /** Tracks whether the notification has already been switched to its "returning" copy, so a
+     *  location update doesn't re-post it on every fix once deliveries are complete. */
+    private var notifiedReturning = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Must move to the foreground promptly, before doing any location work.
-        startForegroundNotification()
-
         val session = sessionStore.load()
+        notifiedReturning = session?.deliveriesComplete == true
+        // Must move to the foreground promptly, before doing any location work.
+        startForegroundNotification(returning = notifiedReturning)
+
         if (session == null || !session.isActive) {
             stopForegroundCompat()
             stopSelf()
@@ -65,6 +71,12 @@ class ShiftTrackingService : Service() {
             runCatching { actionsRepository.updateLocation(loc.lat, loc.lng, loc.speed) }
 
             val session = sessionStore.load() ?: return@collect
+            // All packages are delivered but the driver hasn't reached the depot yet — swap the
+            // notification copy so it no longer reads "Shift in progress" once deliveries are done.
+            if (session.deliveriesComplete && !notifiedReturning) {
+                updateNotification(returning = true)
+                notifiedReturning = true
+            }
             val depotLat = session.depotLat
             val depotLng = session.depotLng
             if (session.deliveriesComplete && depotLat != null && depotLng != null) {
@@ -79,20 +91,34 @@ class ShiftTrackingService : Service() {
         }
     }
 
-    private fun startForegroundNotification() {
+    private fun startForegroundNotification(returning: Boolean) {
         createChannel()
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Shift in progress")
-            .setContentText("Tracking your location for the active shift.")
-            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
-            .setOngoing(true)
-            .build()
+        val notification = buildNotification(returning)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION)
         } else {
             startForeground(NOTIFICATION_ID, notification)
         }
     }
+
+    private fun updateNotification(returning: Boolean) {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.notify(NOTIFICATION_ID, buildNotification(returning))
+    }
+
+    private fun buildNotification(returning: Boolean): Notification =
+        NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(if (returning) "Returning to depot" else "Shift in progress")
+            .setContentText(
+                if (returning) {
+                    "Tracking your location until you're back at the depot."
+                } else {
+                    "Tracking your location for the active shift."
+                },
+            )
+            .setSmallIcon(android.R.drawable.ic_menu_mylocation)
+            .setOngoing(true)
+            .build()
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

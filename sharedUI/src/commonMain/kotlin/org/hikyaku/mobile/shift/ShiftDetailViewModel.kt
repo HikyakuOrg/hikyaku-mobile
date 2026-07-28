@@ -214,6 +214,16 @@ class ShiftDetailViewModel(
         /** True once every package is loaded — trivially true for an ad-hoc shift, which has none. */
         val allPackagesScanned: Boolean get() = packageIds.isEmpty() || scannedCount == scanTotal
 
+        /**
+         * True once every package on this route is actually DELIVERED, per [effectiveStatus] — unlike
+         * [deliveriesComplete] this is derived straight from package status rather than the in-memory
+         * session, so it still holds after a fresh [loadRoute] resets `shiftStarted`/`deliveriesComplete`
+         * to their defaults (e.g. revisiting an already-completed shift). False for an ad-hoc shift,
+         * which has no packages to check.
+         */
+        val allPackagesDelivered: Boolean get() =
+            packageIds.isNotEmpty() && packageIds.all { effectiveStatus(it).equals(ShiftStatus.DELIVERED, ignoreCase = true) }
+
         /** Job stops still awaiting a scan, in route order — the scan overlay's checklist. */
         val unscannedStops: List<RouteStep> get() =
             jobStops.filter { step -> step.assignment?.packageId?.let { it !in scannedPackageIds } == true }

@@ -348,11 +348,12 @@ private fun ShiftDetailScreenContent(
     // loaded and the shift hasn't started yet.
     val canStartShift = !state.isLoadingRoutes && state.routesError == null &&
         state.routes.isNotEmpty() && !state.shiftStarted && !state.isLoadingRoute &&
-        state.jobStops.isNotEmpty()
+        state.jobStops.isNotEmpty() && !state.allPackagesDelivered
 
     // Editing (reschedule / add / remove stops) is only offered before the shift starts.
     val canEdit = !state.isLoadingRoutes && state.routesError == null &&
-        state.routes.isNotEmpty() && !state.shiftStarted && !state.isLoadingRoute
+        state.routes.isNotEmpty() && !state.shiftStarted && !state.isLoadingRoute &&
+        !state.allPackagesDelivered
 
     Scaffold(
         modifier = modifier,
