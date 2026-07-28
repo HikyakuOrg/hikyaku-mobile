@@ -242,6 +242,7 @@ fun ShiftDetailScreen(
     viewModel: ShiftDetailViewModel,
     onBack: () -> Unit,
     onPackageClick: (String) -> Unit,
+    onVehicleClick: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -251,6 +252,7 @@ fun ShiftDetailScreen(
         orgName = viewModel.orgName,
         onBack = onBack,
         onPackageClick = onPackageClick,
+        onVehicleClick = onVehicleClick,
         trackingUrlFor = viewModel::trackingUrlFor,
         onToggleEditMode = viewModel::toggleEditMode,
         onLoadRoutes = viewModel::loadRoutes,
@@ -287,6 +289,7 @@ private fun ShiftDetailScreenContent(
     orgName: String,
     onBack: () -> Unit,
     onPackageClick: (String) -> Unit,
+    onVehicleClick: (String) -> Unit,
     trackingUrlFor: (RouteStep) -> String?,
     onToggleEditMode: () -> Unit,
     onLoadRoutes: () -> Unit,
@@ -432,7 +435,7 @@ private fun ShiftDetailScreenContent(
 
                 item { RouteMap(state, onExpand = { showFullMap = true }) }
 
-                item { TripDetailsCard(state) }
+                item { TripDetailsCard(state, onVehicleClick) }
 
                 if (canStartShift && !state.allPackagesScanned) {
                     item { InfoBanner(stringResource(Res.string.shift_scan_gate_banner)) }
@@ -520,7 +523,7 @@ private fun ShiftDetailScreenContent(
                             PackageCard(
                                 step = step,
                                 recipient = state.recipientFor(step),
-                                status = state.statusFor(step),
+                                status = state.displayStatusFor(step),
                                 images = packageId?.let { state.images[it] } ?: emptyList(),
                                 isInTransit = packageId != null && packageId == state.inTransitPackageId,
                                 isCurrent = step.id == state.currentJobStepId,
@@ -649,6 +652,7 @@ private fun ShiftDetailScreenPreview() {
             orgName = "Acme Logistics",
             onBack = {},
             onPackageClick = {},
+            onVehicleClick = {},
             trackingUrlFor = { null },
             onToggleEditMode = {},
             onLoadRoutes = {},
@@ -1205,14 +1209,20 @@ private fun PoiPopup(
 }
 
 @Composable
-private fun TripDetailsCard(state: ShiftDetailViewModel.UiState) {
+private fun TripDetailsCard(state: ShiftDetailViewModel.UiState, onVehicleClick: (String) -> Unit) {
     val rows = buildList {
         state.startDateTime?.let { add(Res.string.shift_trip_start to formatIsoAsDateTime(it)) }
         state.durationSeconds?.takeIf { it > 0 }?.let { add(Res.string.shift_trip_duration to formatDuration(it)) }
         state.distanceMeters?.takeIf { it > 0 }?.let { add(Res.string.shift_trip_distance to formatDistance(it)) }
-        state.vehicleLabel?.takeIf { it.isNotBlank() }?.let { add(Res.string.shift_trip_vehicle to it) }
     }
-    if (rows.isEmpty()) return
+    val vehicleId = state.vehicleId
+    // "Type • Plate", omitting whichever part is missing (e.g. an ad-hoc shift has a type but no
+    // plate; a package-backed shift usually has both).
+    val vehicleText = listOfNotNull(
+        state.vehicleLabel?.takeIf { it.isNotBlank() },
+        state.vehiclePlate?.takeIf { it.isNotBlank() },
+    ).joinToString(" • ")
+    if (rows.isEmpty() && vehicleText.isBlank()) return
 
     ElevatedCard(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1230,6 +1240,32 @@ private fun TripDetailsCard(state: ShiftDetailViewModel.UiState) {
                     Text(
                         text = value,
                         style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            }
+            if (vehicleText.isNotBlank()) {
+                Row(
+                    modifier = if (vehicleId != null) {
+                        Modifier.fillMaxWidth().clickable { onVehicleClick(vehicleId) }
+                    } else {
+                        Modifier.fillMaxWidth()
+                    },
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(Res.string.shift_trip_vehicle),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Text(
+                        text = vehicleText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (vehicleId != null) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        },
                     )
                 }
             }
@@ -1657,7 +1693,7 @@ private fun StatusBadge(status: String) {
         shape = RoundedCornerShape(percent = 50),
     ) {
         Text(
-            text = status.replace('_', ' ').lowercase(),
+            text = status,
             style = MaterialTheme.typography.labelSmall,
             modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
         )

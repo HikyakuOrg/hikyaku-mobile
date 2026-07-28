@@ -12,10 +12,10 @@ import org.hikyaku.mobile.supabase.SupabaseTables
 import kotlin.concurrent.Volatile
 
 /**
- * Resolves a `package_status.id` from its machine `enums` string, so callers never hardcode a
- * status id. The table is small and effectively static, so the id-by-enum map is read once and
- * cached for the process lifetime; a [Mutex] serialises concurrent first-callers instead of firing
- * one query per caller.
+ * Resolves a `package_status` row from its machine `enums` string, so callers never hardcode a
+ * status id or duplicate its human-readable `status` label. The table is small and effectively
+ * static, so it's read once in full and cached for the process lifetime; a [Mutex] serialises
+ * concurrent first-callers instead of firing one query per caller.
  *
  * The five statuses that existed before scanning shipped ([FALLBACK_IDS]) fall back to their known
  * ids if the lookup can't be completed, so a transient read failure can never break the existing
@@ -29,7 +29,18 @@ class PackageStatusCatalog(
     private val mutex = Mutex()
 
     /** Resolves the `package_status.id` for [statusEnum] (e.g. "ONBOARD_FOR_DELIVERY"). */
-    suspend fun idFor(statusEnum: String): Int {
+    suspend fun idFor(statusEnum: String): Int =
+        rowFor(statusEnum)?.id
+            ?: FALLBACK_IDS[statusEnum]
+            ?: error("Unknown package_status.enums $statusEnum and no cached/fallback id.")
+
+    /**
+     * Resolves the `package_status.status` human-readable label for [statusEnum] (e.g. "Onboard
+     * For Delivery"), or null if the lookup fails and there's no cached row yet.
+     */
+    suspend fun labelFor(statusEnum: String): String? = rowFor(statusEnum)?.label
+
+    private suspend fun rowFor(statusEnum: String): PackageStatusLookupRow? {
         cache[statusEnum]?.let { return it }
         mutex.withLock {
             cache[statusEnum]?.let { return it }
@@ -37,19 +48,17 @@ class PackageStatusCatalog(
                 client.postgrest.from(SupabaseTables.PACKAGE_STATUS)
                     .select()
                     .decodeList<PackageStatusLookupRow>()
-                    .associate { it.enums to it.id }
+                    .associateBy { it.enums }
             }.getOrNull()
             if (fetched != null) cache = fetched
         }
         return cache[statusEnum]
-            ?: FALLBACK_IDS[statusEnum]
-            ?: error("Unknown package_status.enums $statusEnum and no cached/fallback id.")
     }
 
     private companion object {
-        /** Process-wide cache: `enums` -> `id`. Shared across instances since the table is static. */
+        /** Process-wide cache: `enums` -> row. Shared across instances since the table is static. */
         @Volatile
-        var cache: Map<String, Int> = emptyMap()
+        var cache: Map<String, PackageStatusLookupRow> = emptyMap()
 
         /** Known ids for the statuses that existed before scanning shipped; last-resort fallback only. */
         val FALLBACK_IDS = mapOf(

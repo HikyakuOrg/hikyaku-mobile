@@ -74,6 +74,7 @@ class ShiftDetailViewModel(
     private val routePoiRepository: RoutePoiRepository = RoutePoiRepository(),
     private val actionsRepository: ShiftActionsRepository = ShiftActionsRepository(),
     private val editRepository: ShiftEditRepository = ShiftEditRepository(),
+    private val statusCatalog: PackageStatusCatalog = PackageStatusCatalog(),
     private val locationProvider: LocationProvider = LocationProvider(),
     private val sessionStore: ShiftSessionStore = ShiftSessionStore(),
     private val tracker: ShiftTracker = ShiftTracker(),
@@ -112,6 +113,8 @@ class ShiftDetailViewModel(
          * no local persistence: reloading the route re-seeds it from the server.
          */
         val packageStatuses: Map<String, String> = emptyMap(),
+        /** `package_status.status` human-readable label per raw enum, resolved best-effort via [PackageStatusCatalog]. */
+        val statusLabels: Map<String, String> = emptyMap(),
         /** The scan-packages overlay's state; non-null while it's open. */
         val scan: ScanDraft? = null,
         // --- running a shift ---
@@ -154,6 +157,12 @@ class ShiftDetailViewModel(
     ) {
         val jobStops: List<RouteStep> get() = steps.filter { it.isJob }
 
+        /** The route's assigned vehicle id, read off the first job stop that carries one. */
+        val vehicleId: String? get() = jobStops.firstNotNullOfOrNull { it.assignment?.vehicle?.id }
+
+        /** The route's assigned vehicle plate, read off the first job stop that carries one. */
+        val vehiclePlate: String? get() = jobStops.firstNotNullOfOrNull { it.assignment?.vehicle?.plate }
+
         /**
          * The first not-yet-delivered job stop, in route order — the one currently being driven to
          * (or, before the shift starts, the next one up). Only this stop gets a Navigate button.
@@ -171,6 +180,14 @@ class ShiftDetailViewModel(
 
         /** Effective status for a package: the optimistic override, else the fetched status. */
         fun statusFor(step: RouteStep): String? = step.assignment?.packageId?.let { effectiveStatus(it) }
+
+        /**
+         * Human-readable status for [step]: the DB's own `package_status.status` label once
+         * resolved, else a client-side "Onboard For Delivery"-style fallback so the badge never
+         * shows a raw enum while [statusLabels] is still loading.
+         */
+        fun displayStatusFor(step: RouteStep): String? =
+            statusFor(step)?.let { raw -> statusLabels[raw] ?: humanizeStatus(raw) }
 
         /**
          * Effective status for [packageId], layered newest-first: the optimistic override (set by
@@ -327,6 +344,7 @@ class ShiftDetailViewModel(
                     loadImages(routeId, steps)
                     loadTrackingNumbers(routeId, steps)
                     loadMeta(routeId, steps)
+                    loadStatusLabels(seededStatuses.values)
                     if (resume != null) applyResume(resume, steps)
                     // A watcher armed by a previous build (or before a stop was added) may no longer
                     // reflect an unmet scan gate; disarm it so it can't start the shift blind.
@@ -470,6 +488,22 @@ class ShiftDetailViewModel(
         }
     }
 
+    /**
+     * Resolves [PackageStatusCatalog] labels for any of [statuses] not already in
+     * [UiState.statusLabels]. [PackageStatusCatalog] caches the whole (small, static)
+     * `package_status` table process-wide, so in practice this only ever fires one network call.
+     */
+    private fun loadStatusLabels(statuses: Collection<String>) {
+        val missing = statuses.distinct().filterNot { it in _state.value.statusLabels }
+        if (missing.isEmpty()) return
+        viewModelScope.launch {
+            val resolved = missing.mapNotNull { enum -> statusCatalog.labelFor(enum)?.let { enum to it } }.toMap()
+            if (resolved.isNotEmpty()) {
+                _state.value = _state.value.copy(statusLabels = _state.value.statusLabels + resolved)
+            }
+        }
+    }
+
     /** Public tracking-page URL for [step]'s package, once its tracking number is resolved. */
     fun trackingUrlFor(step: RouteStep): String? {
         if (orgSlug.isBlank()) return null
@@ -532,6 +566,7 @@ class ShiftDetailViewModel(
                     // The scan gate is one of computeAutoStartEligible's conditions; re-evaluate so
                     // the watcher can arm the moment the last package is scanned.
                     _state.value = _state.value.copy(autoStartEligible = computeAutoStartEligible())
+                    loadStatusLabels(statuses.values)
                 }
                 .onFailure { error ->
                     if (_state.value.selectedRouteId != routeId) return@onFailure
@@ -1024,3 +1059,13 @@ data class AddStopDraft(
     val submitting: Boolean = false,
     val error: String? = null,
 )
+
+/**
+ * Renders a machine status enum (e.g. `ONBOARD_FOR_DELIVERY`) as "Onboard For Delivery". Only used
+ * as a fallback for [ShiftDetailViewModel.UiState.displayStatusFor] while the real
+ * `package_status.status` label hasn't resolved yet (or for an enum with no matching row).
+ */
+private fun humanizeStatus(status: String): String =
+    status.split('_')
+        .filter { it.isNotBlank() }
+        .joinToString(" ") { word -> word.lowercase().replaceFirstChar(Char::uppercase) }

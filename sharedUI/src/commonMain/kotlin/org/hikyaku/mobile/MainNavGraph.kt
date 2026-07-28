@@ -346,6 +346,7 @@ fun MainNavGraph(
                     viewModel = detailViewModel,
                     onBack = { navController.popBackStack() },
                     onPackageClick = { trackingNumber -> navController.navigate(PackageDetailRoute(trackingNumber)) },
+                    onVehicleClick = { vehicleId -> navController.navigate(VehicleDetailRoute(vehicleId)) },
                 )
             }
         }
