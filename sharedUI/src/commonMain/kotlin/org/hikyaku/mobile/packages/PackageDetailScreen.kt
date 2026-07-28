@@ -91,6 +91,7 @@ import org.hikyaku.mobile.packages.model.PackageParty
 import org.hikyaku.mobile.packages.model.PackageTimelineEntry
 import org.hikyaku.mobile.share.rememberShareText
 import org.hikyaku.mobile.theme.HikyakuTheme
+import org.hikyaku.mobile.util.formatIsoAsDisplayDate
 import org.jetbrains.compose.resources.stringResource
 import qrgenerator.qrkitpainter.rememberQrKitPainter
 
@@ -593,9 +594,9 @@ private fun statusColors(statusEnum: String?): Pair<Color, Color> {
     }
 }
 
-/** Renders an ISO timestamp as `YYYY-MM-DD · HH:MM`, falling back to the raw string if unexpected. */
+/** Renders an ISO timestamp for user-facing display, e.g. "24 July 2026 · 14:30". */
 private fun formatTimestamp(iso: String): String {
-    val date = iso.take(10)
+    val date = formatIsoAsDisplayDate(iso)
     val time = if (iso.length >= 16 && iso[10] == 'T') iso.substring(11, 16) else null
     return if (time != null) "$date · $time" else date
 }

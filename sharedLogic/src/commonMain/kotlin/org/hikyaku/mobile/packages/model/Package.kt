@@ -3,6 +3,7 @@ package org.hikyaku.mobile.packages.model
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.hikyaku.mobile.shift.create.model.ShiftCustomerInput
+import org.hikyaku.mobile.util.formatIsoAsDisplayDate
 
 /** A row from `packages`, as shown in the package overview list. */
 @Serializable
@@ -11,8 +12,8 @@ data class PackageSummary(
     @SerialName("tracking_number") val trackingNumber: String,
     @SerialName("created_at") val createdAt: String,
 ) {
-    /** Date portion (YYYY-MM-DD) of the ISO [createdAt] timestamp. */
-    val createdDate: String get() = createdAt.take(10)
+    /** [createdAt] formatted for user-facing display, e.g. "24 July 2026". */
+    val createdDate: String get() = formatIsoAsDisplayDate(createdAt)
 }
 
 /**
@@ -39,8 +40,8 @@ data class PackageDetail(
     /** Status history, most recent first. */
     val timeline: List<PackageTimelineEntry>,
 ) {
-    /** Date portion (YYYY-MM-DD) of the ISO [createdAt] timestamp. */
-    val createdDate: String get() = createdAt.take(10)
+    /** [createdAt] formatted for user-facing display, e.g. "24 July 2026". */
+    val createdDate: String get() = formatIsoAsDisplayDate(createdAt)
 }
 
 /** A sender or receiver on a package, from the joined `customer` row. */

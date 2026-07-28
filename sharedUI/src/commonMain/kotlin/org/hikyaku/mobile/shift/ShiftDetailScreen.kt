@@ -106,7 +106,7 @@ import org.hikyaku.mobile.shift.scan.ScanPackagesOverlay
 import org.hikyaku.mobile.theme.HikyakuTheme
 import org.hikyaku.mobile.toast.ToastEffect
 import org.hikyaku.mobile.util.combineDateAndTimeToIsoUtc
-import org.hikyaku.mobile.util.epochMillisToIsoDate
+import org.hikyaku.mobile.util.epochMillisToDisplayDate
 import org.hikyaku.mobile.util.formatHourMinute
 import org.hikyaku.mobile.util.formatIsoAsDateTime
 import org.hikyaku.mobile.util.isoDateTimeToHourMinute
@@ -1270,7 +1270,7 @@ private fun RescheduleCard(state: ShiftDetailViewModel.UiState, onReschedule: (S
             Text(stringResource(Res.string.shift_reschedule_title), style = MaterialTheme.typography.titleSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 DateTimeField(
-                    text = dateMillis?.let { epochMillisToIsoDate(it) }
+                    text = dateMillis?.let { epochMillisToDisplayDate(it) }
                         ?: stringResource(Res.string.create_shift_pick_date),
                     onClick = { showDate = true },
                     modifier = Modifier.weight(1f),

@@ -50,6 +50,7 @@ import hikyaku.sharedui.generated.resources.vehicle_detail_section_maintenance
 import hikyaku.sharedui.generated.resources.vehicle_detail_title
 import io.github.jan.supabase.storage.StorageItem
 import org.hikyaku.mobile.theme.HikyakuTheme
+import org.hikyaku.mobile.util.formatIsoAsDisplayDate
 import org.hikyaku.mobile.vehicles.model.MaintenanceRecord
 import org.hikyaku.mobile.vehicles.model.VehicleDetail
 import org.jetbrains.compose.resources.stringResource
@@ -215,7 +216,7 @@ private fun MaintenanceCard(record: MaintenanceRecord, images: List<StorageItem>
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(record.dateServiced, style = MaterialTheme.typography.titleSmall)
+                Text(formatIsoAsDisplayDate(record.dateServiced), style = MaterialTheme.typography.titleSmall)
                 Text(
                     text = stringResource(Res.string.vehicle_detail_odometer_value, formatDecimal(record.odometer)),
                     style = MaterialTheme.typography.bodySmall,

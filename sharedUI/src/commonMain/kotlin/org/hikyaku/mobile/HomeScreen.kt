@@ -88,6 +88,7 @@ import hikyaku.sharedui.generated.resources.shift_deleted_snackbar
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.YearMonth
+import org.hikyaku.mobile.util.formatDisplayDate
 import org.hikyaku.mobile.auth.HomeUiState
 import org.hikyaku.mobile.auth.ShiftsUiState
 import org.hikyaku.mobile.auth.model.AuthState
@@ -630,7 +631,7 @@ private fun CalendarDayCell(
 @Composable
 private fun DateHeader(date: LocalDate) {
     Text(
-        text = date.toString(),
+        text = formatDisplayDate(date),
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),

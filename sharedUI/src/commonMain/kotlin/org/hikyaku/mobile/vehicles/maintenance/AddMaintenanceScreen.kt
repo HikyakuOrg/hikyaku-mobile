@@ -71,7 +71,7 @@ import org.hikyaku.mobile.shift.rememberImagePicker
 import org.hikyaku.mobile.shift.rememberPhotoCapture
 import org.hikyaku.mobile.theme.HikyakuTheme
 import org.hikyaku.mobile.toast.ToastEffect
-import org.hikyaku.mobile.util.epochMillisToIsoDate
+import org.hikyaku.mobile.util.epochMillisToDisplayDate
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -169,7 +169,7 @@ private fun AddMaintenanceScreenContent(
             )
             SectionLabel(stringResource(Res.string.maintenance_section_date_serviced))
             OutlinedButton(onClick = { showDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(state.dateServicedMillis?.let(::epochMillisToIsoDate) ?: stringResource(Res.string.maintenance_date_placeholder))
+                Text(state.dateServicedMillis?.let(::epochMillisToDisplayDate) ?: stringResource(Res.string.maintenance_date_placeholder))
             }
             SectionLabel(stringResource(Res.string.maintenance_section_photos))
             ImagesSection(state, onAddImages, onRemoveImage)

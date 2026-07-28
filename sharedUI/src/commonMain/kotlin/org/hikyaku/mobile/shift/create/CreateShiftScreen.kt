@@ -128,7 +128,7 @@ import org.hikyaku.mobile.shift.rememberImagePicker
 import org.hikyaku.mobile.shift.rememberPhotoCapture
 import org.hikyaku.mobile.theme.HikyakuTheme
 import org.hikyaku.mobile.toast.ToastEffect
-import org.hikyaku.mobile.util.epochMillisToIsoDate
+import org.hikyaku.mobile.util.epochMillisToDisplayDate
 import org.hikyaku.mobile.util.formatHourMinute
 import org.jetbrains.compose.resources.stringResource
 import org.maplibre.compose.camera.CameraPosition
@@ -622,7 +622,7 @@ private fun DetailsStep(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         DateTimeField(
-            text = state.startDateMillis?.let { epochMillisToIsoDate(it) }
+            text = state.startDateMillis?.let { epochMillisToDisplayDate(it) }
                 ?: stringResource(Res.string.create_shift_pick_date),
             onClick = { showDate = true },
             modifier = Modifier.weight(1f),
@@ -949,7 +949,7 @@ private fun NewPackageForm(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 DateTimeField(
-                    text = state.packageArrivalDateMillis?.let { epochMillisToIsoDate(it) }
+                    text = state.packageArrivalDateMillis?.let { epochMillisToDisplayDate(it) }
                         ?: stringResource(Res.string.create_shift_pick_date),
                     onClick = { showDate = true },
                     modifier = Modifier.weight(1f),
@@ -1077,7 +1077,7 @@ private fun ReviewStep(state: CreateShiftUiState) {
             SummaryRow(
                 stringResource(Res.string.create_shift_review_start),
                 state.startDateMillis?.let {
-                    "${epochMillisToIsoDate(it)} ${formatHourMinute(state.startHour, state.startMinute)}"
+                    "${epochMillisToDisplayDate(it)} ${formatHourMinute(state.startHour, state.startMinute)}"
                 } ?: "—",
             )
             SummaryRow(stringResource(Res.string.create_shift_review_from), warehouse)

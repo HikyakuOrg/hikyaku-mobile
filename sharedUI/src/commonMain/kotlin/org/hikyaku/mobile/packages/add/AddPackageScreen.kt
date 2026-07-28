@@ -98,7 +98,7 @@ import org.hikyaku.mobile.shift.rememberImagePicker
 import org.hikyaku.mobile.shift.rememberPhotoCapture
 import org.hikyaku.mobile.theme.HikyakuTheme
 import org.hikyaku.mobile.toast.ToastEffect
-import org.hikyaku.mobile.util.epochMillisToIsoDate
+import org.hikyaku.mobile.util.epochMillisToDisplayDate
 import org.hikyaku.mobile.util.formatHourMinute
 import org.jetbrains.compose.resources.stringResource
 import org.maplibre.spatialk.geojson.Position
@@ -523,7 +523,7 @@ private fun ArrivalSection(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         DateTimeField(
-            text = state.arrivalDateMillis?.let { epochMillisToIsoDate(it) }
+            text = state.arrivalDateMillis?.let { epochMillisToDisplayDate(it) }
                 ?: stringResource(Res.string.create_shift_pick_date),
             onClick = { showDate = true },
             modifier = Modifier.weight(1f),

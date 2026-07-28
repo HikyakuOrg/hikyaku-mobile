@@ -9,9 +9,25 @@ import kotlinx.datetime.atTime
 import kotlinx.datetime.toInstant
 import kotlinx.datetime.toLocalDateTime
 
-/** YYYY-MM-DD slice of the UTC date for [epochMillis], for compact display. */
+/** YYYY-MM-DD slice of the UTC date for [epochMillis]. Not for display — see [epochMillisToDisplayDate]. */
 fun epochMillisToIsoDate(epochMillis: Long): String =
     Instant.fromEpochMilliseconds(epochMillis).toLocalDateTime(TimeZone.UTC).date.toString()
+
+private val MONTH_NAMES = arrayOf(
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+)
+
+/** Formats [date] for user-facing display, e.g. "24 July 2026". */
+fun formatDisplayDate(date: LocalDate): String = "${date.day} ${MONTH_NAMES[date.month.ordinal]} ${date.year}"
+
+/** The UTC date for [epochMillis], formatted for user-facing display, e.g. "24 July 2026". */
+fun epochMillisToDisplayDate(epochMillis: Long): String =
+    formatDisplayDate(Instant.fromEpochMilliseconds(epochMillis).toLocalDateTime(TimeZone.UTC).date)
+
+/** Formats the date portion of an ISO-8601 [isoDateTime] for user-facing display, e.g. "24 July 2026". */
+fun formatIsoAsDisplayDate(isoDateTime: String): String =
+    runCatching { formatDisplayDate(LocalDate.parse(isoDateTime.take(10))) }.getOrDefault(isoDateTime)
 
 /**
  * Combines a UTC date (epoch millis at UTC midnight, the form a Material3 DatePicker returns) with a
@@ -28,11 +44,11 @@ fun isoDateToEpochMillisUtc(isoDateTime: String): Long? =
     runCatching { LocalDate.parse(isoDateTime.take(10)).atStartOfDayIn(TimeZone.UTC).toEpochMilliseconds() }
         .getOrNull()
 
-/** Formats an ISO-8601 [isoDateTime] as a compact `YYYY-MM-DD HH:MM`, or the raw string if unparseable. */
+/** Formats an ISO-8601 [isoDateTime] for user-facing display, e.g. "24 July 2026 14:30", or the raw string if unparseable. */
 fun formatIsoAsDateTime(isoDateTime: String): String =
     runCatching {
         val dateTime = Instant.parse(isoDateTime).toLocalDateTime(TimeZone.UTC)
-        "${dateTime.date} ${dateTime.time.toString().take(5)}"
+        "${formatDisplayDate(dateTime.date)} ${dateTime.time.toString().take(5)}"
     }.getOrDefault(isoDateTime)
 
 /** Zero-padded `HH:MM` for a wall-clock hour/minute, e.g. as read from a Material3 TimePicker. */

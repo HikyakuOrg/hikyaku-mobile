@@ -4,6 +4,7 @@ import kotlinx.datetime.LocalDate
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.hikyaku.mobile.util.formatHourMinute
+import org.hikyaku.mobile.util.formatIsoAsDisplayDate
 import org.hikyaku.mobile.util.isoDateTimeToHourMinute
 
 /**
@@ -29,9 +30,6 @@ data class Shift(
     /** Manually created shifts come from the dispatcher rather than the optimiser. */
     val isManual: Boolean get() = provider.equals("manual", ignoreCase = true)
 
-    /** Date portion (YYYY-MM-DD) of the ISO [createdAt] timestamp. */
-    val createdDate: String get() = createdAt.take(10)
-
     /** The date this shift falls on for calendar grouping: [scheduledStart] if set, else [createdAt]. */
     val calendarDate: LocalDate get() = LocalDate.parse((scheduledStart ?: createdAt).take(10))
 
@@ -39,7 +37,7 @@ data class Shift(
     val displayTime: String
         get() = isoDateTimeToHourMinute(scheduledStart ?: createdAt)
             ?.let { (hour, minute) -> formatHourMinute(hour, minute) }
-            ?: createdDate
+            ?: formatIsoAsDisplayDate(scheduledStart ?: createdAt)
 }
 
 /** The `vrp_solution` summary embedded alongside a [Shift]. */
