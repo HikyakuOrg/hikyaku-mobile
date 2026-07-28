@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -74,6 +75,7 @@ import hikyaku.sharedui.generated.resources.action_next
 import hikyaku.sharedui.generated.resources.action_ok
 import hikyaku.sharedui.generated.resources.action_remove
 import hikyaku.sharedui.generated.resources.address_autocomplete_no_results
+import hikyaku.sharedui.generated.resources.address_pick_on_map
 import hikyaku.sharedui.generated.resources.cd_package_photo
 import hikyaku.sharedui.generated.resources.create_shift_add_new_location
 import hikyaku.sharedui.generated.resources.create_shift_add_new_package
@@ -114,6 +116,8 @@ import hikyaku.sharedui.generated.resources.package_section_sender
 import hikyaku.sharedui.generated.resources.package_submit
 import hikyaku.sharedui.generated.resources.phone_label_default
 import org.hikyaku.mobile.geocode.model.AddressSuggestion
+import org.hikyaku.mobile.map.LocationPickerDialog
+import org.hikyaku.mobile.map.LocationPinIcon
 import org.hikyaku.mobile.map.mapLayersSupported
 import org.hikyaku.mobile.phone.PhoneNumberField
 import org.hikyaku.mobile.shift.create.model.CustomerSuggestion
@@ -681,6 +685,7 @@ private fun DetailsStep(
             suggestions = state.warehouseSuggestions,
             searching = state.warehouseSearching,
             hasSelection = state.pickedWarehouse != null,
+            initialMapPosition = state.pickedWarehouse?.let { Position(longitude = it.lon, latitude = it.lat) },
             onQueryChange = onWarehouseQueryChange,
             onPick = onPickWarehouseAddress,
         )
@@ -1054,6 +1059,7 @@ private fun PackagePartyFields(
         suggestions = customer.suggestions,
         searching = customer.searching,
         hasSelection = customer.picked != null,
+        initialMapPosition = customer.picked?.let { Position(longitude = it.lon, latitude = it.lat) },
         onQueryChange = onQueryChange,
         onPick = onPickAddress,
     )
@@ -1103,9 +1109,11 @@ private fun AddressAutocomplete(
     suggestions: List<AddressSuggestion>,
     searching: Boolean,
     hasSelection: Boolean,
+    initialMapPosition: Position?,
     onQueryChange: (String) -> Unit,
     onPick: (AddressSuggestion) -> Unit,
 ) {
+    var showLocationPicker by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxWidth()) {
         OutlinedTextField(
             value = query,
@@ -1119,6 +1127,11 @@ private fun AddressAutocomplete(
             },
             modifier = Modifier.fillMaxWidth(),
         )
+        TextButton(onClick = { showLocationPicker = true }) {
+            Icon(LocationPinIcon, contentDescription = null, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(4.dp))
+            Text(stringResource(Res.string.address_pick_on_map))
+        }
         if (!searching && !hasSelection && suggestions.isEmpty() && query.trim().length >= ADDRESS_MIN_QUERY_LENGTH) {
             Text(
                 text = stringResource(Res.string.address_autocomplete_no_results),
@@ -1136,6 +1149,16 @@ private fun AddressAutocomplete(
                 HorizontalDivider()
             }
         }
+    }
+    if (showLocationPicker) {
+        LocationPickerDialog(
+            initialPosition = initialMapPosition,
+            onDismiss = { showLocationPicker = false },
+            onConfirm = {
+                onPick(it)
+                showLocationPicker = false
+            },
+        )
     }
 }
 

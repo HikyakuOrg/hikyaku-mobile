@@ -16,6 +16,8 @@ import org.hikyaku.mobile.net.ApiEndpoints
 import org.hikyaku.mobile.net.ApiHeaders
 import org.hikyaku.mobile.net.appHttpClient
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.pow
+import kotlin.math.round
 
 /**
  * Address autocomplete via the Hikyaku geocode endpoint (`GET /geocode/autocomplete?text=`),
@@ -44,6 +46,43 @@ class GeocodeRepository(
         // cancellation propagate instead of reporting it as a real failure, otherwise runCatching
         // turns it into a Result.failure and breaks structured concurrency.
         if (it is CancellationException) throw it
+    }
+
+    /**
+     * Reverse-geocodes a point to its nearest addressable feature, for a user-dropped map pin
+     * (`GET /geocode/reverse?lat=&lon=&limit=1`). Falls back to a coordinate-only [AddressSuggestion]
+     * when Photon has nothing addressable nearby (e.g. open water, remote areas), so the caller can
+     * still store the coordinates the pin was dropped at.
+     */
+    suspend fun reverseGeocode(lat: Double, lon: Double): Result<AddressSuggestion> = runCatching {
+        val endpoint = ApiEndpoints.geocodeReverse(apiUrl())
+        val token = accessToken()
+        val collection: GeoJsonFeatureCollectionDto = httpClient.get(endpoint) {
+            header(ApiHeaders.AUTHORIZATION, ApiHeaders.bearer(token))
+            header("Accept", "application/json")
+            parameter("lat", lat)
+            parameter("lon", lon)
+            parameter("limit", 1)
+        }.body()
+        collection.features.firstNotNullOfOrNull { it.toSuggestion() } ?: AddressSuggestion(
+            label = "Dropped pin (${lat.roundTo(5)}, ${lon.roundTo(5)})",
+            street = null,
+            suburb = null,
+            state = null,
+            country = null,
+            postcode = null,
+            lat = lat,
+            lon = lon,
+            gid = null,
+            confidence = null,
+        )
+    }.onFailure {
+        if (it is CancellationException) throw it
+    }
+
+    private fun Double.roundTo(decimals: Int): Double {
+        val factor = 10.0.pow(decimals)
+        return round(this * factor) / factor
     }
 
     private fun accessToken(): String =

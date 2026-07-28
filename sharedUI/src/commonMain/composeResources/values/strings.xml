@@ -198,6 +198,10 @@
     <string name="create_shift_use_saved_location">Use a saved location instead</string>
     <string name="create_shift_label_address">Address</string>
     <string name="address_autocomplete_no_results">No address found</string>
+    <string name="address_pick_on_map">Pick on map</string>
+    <string name="location_picker_title">Choose a location</string>
+    <string name="location_picker_confirm">Use this location</string>
+    <string name="location_picker_resolving">Finding address…</string>
     <string name="create_shift_no_packages_available">No unassigned packages at this location yet. Create one below.</string>
     <string name="create_shift_add_new_package">+ Create a new package</string>
     <string name="create_shift_delivery_by">Delivery by %1$s:%2$s</string>
