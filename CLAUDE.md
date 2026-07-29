@@ -1,6 +1,27 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## API Contracts
+
+### Swagger Docs
+Generate API calls using gradle's swagger plugin instead of hand wiring. 
+
+## Coding Style
+
+### Null Safety
+Frequent use of !! usually reveals bad state management or poor API design. 
+
+Instead of forcing a value to be non-null, provide a fallback safe default value
+
+```
+val nonNullData = checkNotNull(data) { "Initialization failed: Data packet cannot be null." }
+val id = nonNullData.id
+```
+
+DO NOT use !!
+
+```
+val id = data!!.id
+```
 
 ### Code Intelligence
 
@@ -13,3 +34,7 @@ Prefer LSP over Grep/Read for code navigation — it's faster, precise, and avoi
 Use Grep only when LSP isn't available or for text/pattern searches (comments, strings, config).
 
 After writing or editing code, check LSP diagnostics and fix errors before proceeding.
+
+
+Prefer Java Docs MCP over Grep/Read for versioned documentation for the artifact. 
+
