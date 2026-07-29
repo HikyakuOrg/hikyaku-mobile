@@ -67,8 +67,8 @@ jobs:
         run: echo "GIT_SHA=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
 
       - name: Build APK and upload to Firebase App Distribution
-        run: >
+        run: |
           chmod +x gradlew
-          ./gradlew :androidApp:appDistributionUploadRelease --stacktrace
-          -PappVersionCode=${{ github.run_number }}
-          -PappVersionName=1.0.0-${{ env.GIT_SHA }}
+          ./gradlew :androidApp:appDistributionUploadRelease --stacktrace \
+            -PappVersionCode=${{ github.run_number }} \
+            -PappVersionName=1.0.0-${{ env.GIT_SHA }}
