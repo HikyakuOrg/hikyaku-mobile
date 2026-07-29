@@ -68,6 +68,7 @@ jobs:
 
       - name: Build APK and upload to Firebase App Distribution
         run: >
+          chmod +x gradlew
           ./gradlew :androidApp:appDistributionUploadRelease --stacktrace
           -PappVersionCode=${{ github.run_number }}
           -PappVersionName=1.0.0-${{ env.GIT_SHA }}
