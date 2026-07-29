@@ -12,19 +12,19 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
 
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
       - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v4
+        uses: gradle/actions/setup-gradle@v5
 
       - name: Write Firebase service account credentials
         env:
@@ -69,6 +69,6 @@ jobs:
       - name: Build APK and upload to Firebase App Distribution
         run: |
           chmod +x gradlew
-          ./gradlew :androidApp:appDistributionUploadRelease --stacktrace \
+          ./gradlew :androidApp:assembleRelease :androidApp:appDistributionUploadRelease --stacktrace \
             -PappVersionCode=${{ github.run_number }} \
             -PappVersionName=1.0.0-${{ env.GIT_SHA }}
