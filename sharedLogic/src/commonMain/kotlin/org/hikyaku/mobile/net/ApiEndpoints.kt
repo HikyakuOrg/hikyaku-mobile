@@ -28,4 +28,17 @@ object ApiEndpoints {
      * `vrp_optimization` id. Used by the mobile create-shift flow.
      */
     fun optimisationAdhoc(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/optimisation/adhoc"
+
+    /**
+     * `POST {apiUrl}/api/v1/optimisation/run` — queues a warehouse-wide optimisation run that
+     * assigns all of its unassigned packages to routes. Returns immediately with the queued run's
+     * id; poll [optimisationRunLatest] for its outcome.
+     */
+    fun optimisationRun(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/optimisation/run"
+
+    /**
+     * `GET {apiUrl}/api/v1/optimisation/run/latest` — the organisation's most recent
+     * warehouse-wide optimisation run (or null if it has never run one).
+     */
+    fun optimisationRunLatest(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/optimisation/run/latest"
 }

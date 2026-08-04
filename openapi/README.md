@@ -12,7 +12,7 @@ client models" section there), using the OpenAPI generator Gradle plugin.
 
 ## What's wired into the app
 
-The mobile app calls **4** of the 35 documented endpoints, so only the request/response DTOs for
+The mobile app calls **6** of the 35 documented endpoints, so only the request/response DTOs for
 those are compiled. `./gradlew syncModels` regenerates the full client into a build-directory
 scratch dir, then syncs the DTOs the app uses straight into
 `sharedLogic/src/commonMain/kotlin/org/hikyaku/mobile/api/generated/models/` (package
@@ -25,6 +25,8 @@ scratch dir, then syncs the DTOs the app uses straight into
 | `GET /geocode/reverse` | `RoutePoiRepository` | `GeoJsonFeatureCollectionDto` (…) |
 | `POST /api/v1/routing/route` | `RoutingRepository` | `RouteRequestDto` → `RoutePreviewDto` (+ `Leg`/`Summary`) |
 | `POST /api/v1/optimisation/adhoc` | `CreateShiftRepository` | `AdhocOptimisationDto` → `AdhocOptimisationResultDto` |
+| `POST /api/v1/optimisation/run` | `OptimisationRepository` | `RunOptimisationDto` (+ `SetOffOverrideDto`) → `RunOptimisationResultDto` |
+| `GET /api/v1/optimisation/run/latest` | `OptimisationRepository` | `LatestOptimisationRunDto` |
 
 The repositories keep calling through the app's shared `appHttpClient` / `ApiEndpoints`; only the
 wire DTOs are generated (the generator's parallel `ApiClient` runtime and the 30 unused endpoint

@@ -45,9 +45,12 @@ import hikyaku.sharedui.generated.resources.action_retry
 import hikyaku.sharedui.generated.resources.cd_open_navigation_menu
 import hikyaku.sharedui.generated.resources.package_2
 import hikyaku.sharedui.generated.resources.package_no_packages
+import hikyaku.sharedui.generated.resources.package_optimise_button
 import hikyaku.sharedui.generated.resources.package_overview_title
 import org.hikyaku.mobile.packages.model.PackageSummary
+import org.hikyaku.mobile.packages.optimisation.OptimisationProgressDialog
 import org.hikyaku.mobile.theme.HikyakuTheme
+import org.hikyaku.mobile.toast.ToastEffect
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
@@ -61,9 +64,15 @@ fun PackagesScreen(
     onLoadMore: () -> Unit,
     onRefresh: () -> Unit,
     onPackageClick: (PackageSummary) -> Unit,
+    onOptimise: () -> Unit,
+    onDismissOptimisation: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
+    ToastEffect(state.optimisationToast)
+    state.optimisation?.let { progress ->
+        OptimisationProgressDialog(progress = progress, onClose = onDismissOptimisation)
+    }
 
     // Requests the next page once the user has scrolled near the end of what's loaded.
     val shouldLoadMore by remember {
@@ -84,6 +93,11 @@ fun PackagesScreen(
                 navigationIcon = {
                     IconButton(onClick = onOpenDrawer) {
                         Icon(Icons.Filled.Menu, contentDescription = stringResource(Res.string.cd_open_navigation_menu))
+                    }
+                },
+                actions = {
+                    TextButton(onClick = onOptimise) {
+                        Text(stringResource(Res.string.package_optimise_button))
                     }
                 },
             )
@@ -164,6 +178,8 @@ private fun PackagesScreenPreview() {
             onLoadMore = {},
             onRefresh = {},
             onPackageClick = {},
+            onOptimise = {},
+            onDismissOptimisation = {},
         )
     }
 }

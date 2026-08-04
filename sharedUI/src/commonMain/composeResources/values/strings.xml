@@ -263,6 +263,17 @@
     <string name="package_detail_no_timeline">No status updates yet.</string>
     <string name="package_detail_section_pod">Proof of delivery</string>
 
+    <!-- One-click optimise -->
+    <string name="package_optimise_button">Optimise</string>
+    <string name="package_optimise_title">Optimising</string>
+    <string name="cd_package_optimise_close">Close</string>
+    <string name="package_optimise_succeeded_title">Done</string>
+    <string name="package_optimise_failed_title">Optimisation failed</string>
+    <string name="package_optimise_error_no_warehouse">No warehouse is set up for this organisation yet.</string>
+    <string name="package_optimise_error_none">No unassigned packages to optimise.</string>
+    <string name="package_optimise_error_rate_limited">Optimisation was run recently — try again shortly.</string>
+    <string name="package_optimise_error_failed">Couldn't run the optimisation.</string>
+
     <!-- Add package -->
     <string name="package_add_title">Add Package</string>
     <string name="package_section_dimensions">Dimensions</string>

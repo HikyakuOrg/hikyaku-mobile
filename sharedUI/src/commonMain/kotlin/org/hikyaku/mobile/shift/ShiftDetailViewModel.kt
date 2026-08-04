@@ -268,10 +268,8 @@ class ShiftDetailViewModel(
             )
         }
         viewModelScope.launch {
-            println("DIAG loadRoutes shiftId=$shiftId")
             repository.fetchRoutes(shiftId)
                 .onSuccess { routes ->
-                    println("DIAG routes=${routes.map { it.id }}")
                     // Resume into the persisted route if one is active for this shift.
                     val resume = sessionStore.load()?.takeIf { it.shiftId == shiftId && it.isActive }
                     val targetRouteId = resume?.routeId?.takeIf { id -> routes.any { it.id == id } }

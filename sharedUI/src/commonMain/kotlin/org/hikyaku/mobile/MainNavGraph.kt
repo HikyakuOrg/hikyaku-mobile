@@ -213,7 +213,10 @@ fun MainNavGraph(
             }
             composable<PackagesRoute> { entry ->
                 val packagesViewModel: PackagesViewModel = viewModel(key = homeState.selectedOrgId) {
-                    PackagesViewModel(orgId = homeState.selectedOrgId.orEmpty())
+                    PackagesViewModel(
+                        orgId = homeState.selectedOrgId.orEmpty(),
+                        orgSlug = homeState.selectedOrganisation?.slug.orEmpty(),
+                    )
                 }
                 val packagesState by packagesViewModel.state.collectAsState()
                 // Set by AddPackageRoute's onDone, so returning from a successful add refreshes the list.
@@ -232,6 +235,8 @@ fun MainNavGraph(
                     onLoadMore = packagesViewModel::loadNextPage,
                     onRefresh = packagesViewModel::refresh,
                     onPackageClick = { pkg -> navController.navigate(PackageDetailRoute(pkg.trackingNumber)) },
+                    onOptimise = packagesViewModel::startOptimisation,
+                    onDismissOptimisation = packagesViewModel::dismissOptimisation,
                 )
             }
             composable<PackageDetailRoute> { entry ->

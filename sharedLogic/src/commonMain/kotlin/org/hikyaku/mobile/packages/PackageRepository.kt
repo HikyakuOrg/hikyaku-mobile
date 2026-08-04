@@ -91,6 +91,25 @@ class PackageRepository(
         files.map { name -> authenticatedStorageItem(SupabaseBuckets.PACKAGES, "$packageId/$name") }
     }
 
+    /**
+     * How many of [orgId]'s packages at [warehouseId] are unassigned (`optimisation_id IS NULL`) —
+     * the set a warehouse-wide optimisation run would pick up. Mirrors the same filter as
+     * [org.hikyaku.mobile.shift.create.CreateShiftRepository.fetchAvailablePackages], but only
+     * selects `id` since the caller just needs a count.
+     */
+    suspend fun countUnassignedPackages(orgId: String, warehouseId: String): Result<Int> = runCatching {
+        client.postgrest.from(SupabaseTables.PACKAGES)
+            .select(Columns.raw("id")) {
+                filter {
+                    eq("organisation_id", orgId)
+                    eq("warehouse_id", warehouseId)
+                    exact("optimisation_id", null)
+                }
+            }
+            .decodeList<IdRow>()
+            .size
+    }
+
     /** The org's existing warehouses, so the user can pick a starting location for the package. */
     suspend fun fetchWarehouses(orgId: String): Result<List<WarehouseOption>> = runCatching {
         client.postgrest.from(SupabaseTables.WAREHOUSE)
@@ -151,6 +170,11 @@ class PackageRepository(
      * Persists [draft]: resolves (or creates) the sender and receiver customers, inserts the
      * `packages` row, its dimensions and delivery window, then uploads any [PackageDraft.images] to
      * the `packages` bucket. Returns the new package's id.
+     *
+     * Also stamps an initial `package_timeline` row at the PENDING status — nothing else does this
+     * (there's no longer a DB trigger for it, see `drop_stale_package_status_trigger`), and the
+     * warehouse-wide optimiser's candidate query joins `package_timeline` with an inner join, so a
+     * package with no timeline row is invisible to it forever.
      */
     suspend fun createPackage(draft: PackageDraft): Result<String> = runCatching {
         val fromCustomerId = ensureCustomer(draft.organisationId, draft.sender)
@@ -179,9 +203,21 @@ class PackageRepository(
         client.postgrest.from(SupabaseTables.PACKAGE_DELIVERY_WINDOW).insert(
             PackageDeliveryWindowInsert(packageId = packageId, scheduledArrival = draft.scheduledArrival),
         )
+        client.postgrest.from(SupabaseTables.PACKAGE_TIMELINE).insert(
+            PackageTimelineInsert(packageId = packageId, packageStatus = resolvePendingStatusId()),
+        )
         draft.images.forEachIndexed { index, bytes -> uploadImage(packageId, index, bytes) }
         packageId
     }
+
+    /** The `package_status.id` whose `enums` is `PENDING` — every new package starts at this status. */
+    private suspend fun resolvePendingStatusId(): Long =
+        client.postgrest.from(SupabaseTables.PACKAGE_STATUS)
+            .select(Columns.raw("id")) {
+                filter { eq("enums", "PENDING") }
+            }
+            .decodeSingle<PackageStatusIdRow>()
+            .id
 
     private suspend fun uploadImage(packageId: String, index: Int, bytes: ByteArray) {
         val path = "$packageId/photo_$index.jpg"
@@ -266,6 +302,9 @@ class PackageRepository(
 
 @Serializable
 private data class IdRow(val id: String)
+
+@Serializable
+private data class PackageStatusIdRow(val id: Long)
 
 @Serializable
 private data class PackageDetailRow(
@@ -467,6 +506,12 @@ private data class PackageDimensionsInsert(
 private data class PackageDeliveryWindowInsert(
     @SerialName("package_id") val packageId: String,
     @SerialName("scheduled_arrival") val scheduledArrival: String,
+)
+
+@Serializable
+private data class PackageTimelineInsert(
+    @SerialName("package_id") val packageId: String,
+    @SerialName("package_status") val packageStatus: Long,
 )
 
 @Serializable
