@@ -6,6 +6,7 @@ import kotlinx.serialization.Serializable
 import org.hikyaku.mobile.util.formatHourMinute
 import org.hikyaku.mobile.util.formatIsoAsDisplayDate
 import org.hikyaku.mobile.util.isoDateTimeToHourMinute
+import org.maplibre.spatialk.geojson.Point
 
 /**
  * A row from the `vrp_optimization` table, which represents a single shift
@@ -38,6 +39,22 @@ data class Shift(
         get() = isoDateTimeToHourMinute(scheduledStart ?: createdAt)
             ?.let { (hour, minute) -> formatHourMinute(hour, minute) }
             ?: formatIsoAsDisplayDate(scheduledStart ?: createdAt)
+
+    /** Number of delivery stops (`job` steps) across every route in the shift's solution. */
+    val stopCount: Int
+        get() = solutions.firstOrNull()?.routes.orEmpty().sumOf { route ->
+            route.steps.count { it.type.equals("job", ignoreCase = true) }
+        }
+
+    /**
+     * Each route's stops in travel order (start → jobs → end) as coordinates, used to draw a
+     * small route-shape preview on the home screen. A route with fewer than two located steps
+     * is dropped since it can't be drawn as a line.
+     */
+    val routePaths: List<List<Point>>
+        get() = solutions.firstOrNull()?.routes.orEmpty()
+            .map { route -> route.steps.sortedBy { it.stepIndex }.mapNotNull { it.location } }
+            .filter { it.size >= 2 }
 }
 
 /** The `vrp_solution` summary embedded alongside a [Shift]. */
@@ -46,4 +63,19 @@ data class ShiftSolution(
     @SerialName("routes_count") val routesCount: Int? = null,
     @SerialName("unassigned_count") val unassignedCount: Int? = null,
     val duration: Int? = null,
+    @SerialName("vrp_route") val routes: List<ShiftRoute> = emptyList(),
+)
+
+/** A `vrp_route` embedded alongside a [ShiftSolution], carrying just enough to draw its shape. */
+@Serializable
+data class ShiftRoute(
+    @SerialName("vrp_route_step") val steps: List<ShiftRouteStep> = emptyList(),
+)
+
+/** A `vrp_route_step` embedded alongside a [ShiftRoute]. */
+@Serializable
+data class ShiftRouteStep(
+    @SerialName("step_index") val stepIndex: Int,
+    val type: String,
+    val location: Point? = null,
 )

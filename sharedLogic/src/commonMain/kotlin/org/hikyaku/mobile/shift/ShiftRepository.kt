@@ -18,12 +18,18 @@ class ShiftRepository(
      * Returns the shifts (route-optimisation runs) belonging to [orgId], newest
      * first. The `organisation_id` filter scopes the result to the selected
      * organisation; Row Level Security additionally restricts it to users with
-     * the `shifts.view` permission in that org.
+     * the `shifts.view` permission in that org. Each shift's routes are embedded
+     * down to their step coordinates in this one query so the home-screen list
+     * can show a stop count and a route-shape preview without an N+1 fetch.
      */
     suspend fun fetchShifts(orgId: String): Result<List<Shift>> = runCatching {
         client.postgrest.from(SupabaseTables.VRP_OPTIMIZATION)
             .select(
-                Columns.raw("id, created_at, provider, scheduled_start, vrp_solution(routes_count, unassigned_count, duration)"),
+                Columns.raw(
+                    "id, created_at, provider, scheduled_start, " +
+                        "vrp_solution(routes_count, unassigned_count, duration, " +
+                        "vrp_route(vrp_route_step(step_index, type, location)))",
+                ),
             ) {
                 filter { eq("organisation_id", orgId) }
                 order("created_at", Order.DESCENDING)

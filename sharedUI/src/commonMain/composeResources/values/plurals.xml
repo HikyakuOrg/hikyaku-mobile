@@ -8,6 +8,10 @@
         <item quantity="one">%1$d package to deliver</item>
         <item quantity="other">%1$d packages to deliver</item>
     </plurals>
+    <plurals name="home_stops_count">
+        <item quantity="one">%1$d stop</item>
+        <item quantity="other">%1$d stops</item>
+    </plurals>
     <plurals name="shift_scan_remaining_count">
         <item quantity="one">%1$d package left</item>
         <item quantity="other">%1$d packages left</item>

@@ -1,5 +1,6 @@
 package org.hikyaku.mobile
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.CircleShape
@@ -22,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Menu
@@ -58,6 +61,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -84,6 +89,7 @@ import hikyaku.sharedui.generated.resources.home_no_shifts
 import hikyaku.sharedui.generated.resources.home_no_shifts_for_date
 import hikyaku.sharedui.generated.resources.home_packages_to_deliver_count
 import hikyaku.sharedui.generated.resources.home_section_completed
+import hikyaku.sharedui.generated.resources.home_stops_count
 import hikyaku.sharedui.generated.resources.shift_deleted_snackbar
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
@@ -94,11 +100,14 @@ import org.hikyaku.mobile.auth.ShiftsUiState
 import org.hikyaku.mobile.auth.model.AuthState
 import org.hikyaku.mobile.organisation.model.Organisation
 import org.hikyaku.mobile.shift.model.Shift
+import org.hikyaku.mobile.shift.model.ShiftRoute
+import org.hikyaku.mobile.shift.model.ShiftRouteStep
 import org.hikyaku.mobile.shift.model.ShiftSolution
 import org.hikyaku.mobile.theme.HikyakuTheme
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import org.maplibre.spatialk.geojson.Point
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -290,20 +299,47 @@ private val previewOrganisations = listOf(
     Organisation(id = "org-2", name = "Acme Logistics", slug = "acme-logistics", orgType = "team", createdBy = "user-1"),
 )
 
+private fun previewRoute(vararg coordinates: Pair<Double, Double>): ShiftRoute = ShiftRoute(
+    steps = coordinates.mapIndexed { index, (lng, lat) ->
+        ShiftRouteStep(stepIndex = index, type = "job", location = Point(longitude = lng, latitude = lat))
+    },
+)
+
 private val previewShifts = listOf(
     Shift(
         id = "shift-1",
         createdAt = "2026-07-25T08:00:00Z",
         provider = "optimizer",
         scheduledStart = "2026-07-25T08:00:00Z",
-        solutions = listOf(ShiftSolution(routesCount = 4, unassignedCount = 1, duration = 3600)),
+        solutions = listOf(
+            ShiftSolution(
+                routesCount = 4,
+                unassignedCount = 1,
+                duration = 3600,
+                routes = listOf(
+                    previewRoute(
+                        103.8318 to 1.3048,
+                        103.8390 to 1.3005,
+                        103.8450 to 1.3100,
+                        103.8500 to 1.2980,
+                    ),
+                ),
+            ),
+        ),
     ),
     Shift(
         id = "shift-2",
         createdAt = "2026-07-24T08:00:00Z",
         provider = "manual",
         scheduledStart = "2026-07-24T08:00:00Z",
-        solutions = listOf(ShiftSolution(routesCount = 2, unassignedCount = 0, duration = 1800)),
+        solutions = listOf(
+            ShiftSolution(
+                routesCount = 2,
+                unassignedCount = 0,
+                duration = 1800,
+                routes = listOf(previewRoute(103.8200 to 1.2900, 103.8260 to 1.2950)),
+            ),
+        ),
     ),
 )
 
@@ -717,19 +753,102 @@ private fun ShiftCard(shift: Shift, isCompleted: Boolean, packageCount: Int, onC
                 Text(shift.displayTime, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.weight(1f))
                 if (isCompleted) {
-                    Text(
-                        text = stringResource(Res.string.home_section_completed),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    CompletedBadge()
                 }
             }
             Spacer(Modifier.height(4.dp))
-            Text(
-                text = pluralStringResource(Res.plurals.home_packages_to_deliver_count, packageCount, packageCount),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = pluralStringResource(Res.plurals.home_stops_count, shift.stopCount, shift.stopCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = " • ",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Text(
+                    text = pluralStringResource(Res.plurals.home_packages_to_deliver_count, packageCount, packageCount),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (shift.routePaths.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                ShiftRoutePreview(
+                    routePaths = shift.routePaths,
+                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                )
+            }
+        }
+    }
+}
+
+/** A small "Completed" indicator shown once every package on a shift has been delivered. */
+@Composable
+private fun CompletedBadge() {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(
+            imageVector = Icons.Filled.CheckCircle,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(16.dp),
+        )
+        Spacer(Modifier.width(4.dp))
+        Text(
+            text = stringResource(Res.string.home_section_completed),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+}
+
+/**
+ * A compact, non-interactive preview of a shift's route shape: each route's stops connected by
+ * straight lines and scaled to fit the available space. This is not a real map (no streets or
+ * tiles) — just a quick visual cue built from the same stop coordinates already loaded for the
+ * stop count, so it stays cheap enough to render inline for every row in the list.
+ */
+@Composable
+private fun ShiftRoutePreview(routePaths: List<List<Point>>, modifier: Modifier = Modifier) {
+    val lineColor = MaterialTheme.colorScheme.primary
+    val stopColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+    ) {
+        Canvas(modifier = Modifier.fillMaxSize().padding(8.dp)) {
+            val allPoints = routePaths.flatten()
+            if (allPoints.isEmpty()) return@Canvas
+            val longitudes = allPoints.map { it.longitude }
+            val latitudes = allPoints.map { it.latitude }
+            val minLon = longitudes.min()
+            val minLat = latitudes.min()
+            val lonSpan = (longitudes.max() - minLon).takeIf { it > 0.0 } ?: 1.0
+            val latSpan = (latitudes.max() - minLat).takeIf { it > 0.0 } ?: 1.0
+
+            fun project(point: Point): Offset {
+                val x = ((point.longitude - minLon) / lonSpan).toFloat() * size.width
+                // Latitude increases north but the y axis increases downward, so flip it.
+                val y = (1f - ((point.latitude - minLat) / latSpan).toFloat()) * size.height
+                return Offset(x, y)
+            }
+
+            routePaths.forEach { path ->
+                val offsets = path.map(::project)
+                for (i in 0 until offsets.size - 1) {
+                    drawLine(
+                        color = lineColor,
+                        start = offsets[i],
+                        end = offsets[i + 1],
+                        strokeWidth = 3.dp.toPx(),
+                        cap = StrokeCap.Round,
+                    )
+                }
+                offsets.forEach { offset -> drawCircle(color = stopColor, radius = 2.5.dp.toPx(), center = offset) }
+            }
         }
     }
 }
