@@ -68,8 +68,10 @@ fun AuthNavGraph(
     ) {
         composable(AuthRoutes.WELCOME) {
             WelcomeScreen(
+                state = state,
                 onSignInClick = { viewModel.clearMessages(); navController.navigate(AuthRoutes.SIGN_IN) },
                 onSignUpClick = { viewModel.clearMessages(); navController.navigate(AuthRoutes.SIGN_UP) },
+                onGoogleSignIn = viewModel::signInWithGoogle,
                 onSelfHostedClick = { onClearEnvError(); navController.navigate(AuthRoutes.ENVIRONMENT) },
             )
         }

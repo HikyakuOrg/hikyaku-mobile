@@ -37,6 +37,10 @@ kotlin {
             // Shipping-label printing; the actual for `expect fun rememberPrintShippingLabel`.
             implementation(libs.androidx.print)
             implementation(libs.zxing.core)
+            // Google native sign-in; the actual for `expect fun rememberGoogleIdTokenLauncher`.
+            implementation(libs.androidx.credentials)
+            implementation(libs.androidx.credentials.playServicesAuth)
+            implementation(libs.googleid)
         }
         jvmMain.dependencies {
             // Phone-number validation/formatting; the actual for `expect object PhoneNumbers`.

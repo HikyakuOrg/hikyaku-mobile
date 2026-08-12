@@ -69,6 +69,7 @@
     <!-- Auth -->
     <string name="auth_sign_in">Sign In</string>
     <string name="auth_sign_up">Sign Up</string>
+    <string name="auth_continue_with_google">Continue with Google</string>
     <string name="auth_create_account_title">Create Account</string>
     <string name="auth_label_email">Email</string>
     <string name="auth_label_password">Password</string>
@@ -79,6 +80,7 @@
     <string name="auth_hide_password">Hide password</string>
     <string name="auth_error_missing_credentials">Please enter your email and password.</string>
     <string name="auth_error_sign_in_failed">Invalid credentials.</string>
+    <string name="auth_error_google_sign_in_failed">Google sign-in failed. Please try again.</string>
     <string name="auth_error_missing_display_name">Please enter a display name.</string>
     <string name="auth_error_missing_email">Please enter your email.</string>
     <string name="auth_error_password_too_short">Password must be at least 6 characters.</string>

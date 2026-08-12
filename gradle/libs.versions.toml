@@ -6,6 +6,7 @@ android-targetSdk = "36"
 androidx-activity = "1.13.0"
 androidx-appcompat = "1.7.1"
 androidx-core = "1.16.0"
+androidx-credentials = "1.6.0"
 androidx-startup = "1.2.0"
 androidx-espresso = "3.7.0"
 androidx-lifecycle = "2.11.0-beta01"
@@ -16,6 +17,7 @@ calendar = "2.10.1"
 composeMultiplatform = "1.11.1"
 composeMaterialIconsCore = "1.7.3"
 firebaseAppDistribution = "5.2.1"
+googleid = "1.2.0"
 junit = "4.13.2"
 kotlin = "2.4.0"
 libphonenumber = "9.0.16"
@@ -46,6 +48,9 @@ androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "a
 androidx-startup-runtime = { module = "androidx.startup:startup-runtime", version.ref = "androidx-startup" }
 androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity" }
 androidx-print = { module = "androidx.print:print", version.ref = "androidx-print" }
+androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "androidx-credentials" }
+androidx-credentials-playServicesAuth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "androidx-credentials" }
+googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 calendar-composeMultiplatform = { module = "com.kizitonwose.calendar:compose-multiplatform", version.ref = "calendar" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
 coil-network-ktor3 = { module = "io.coil-kt.coil3:coil-network-ktor3", version.ref = "coil" }

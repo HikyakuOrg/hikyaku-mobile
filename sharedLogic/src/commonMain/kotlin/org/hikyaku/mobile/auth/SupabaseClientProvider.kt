@@ -64,6 +64,7 @@ object SupabaseClientProvider {
             }
         }
         ApiConfigProvider.set(config.hikyakuApiUrl)
+        GoogleAuthConfig.set(config.googleWebClientId)
         previous?.close()
     }
 }

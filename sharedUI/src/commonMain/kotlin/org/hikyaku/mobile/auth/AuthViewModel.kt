@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import hikyaku.sharedui.generated.resources.Res
 import hikyaku.sharedui.generated.resources.account_error_update_name_failed
 import hikyaku.sharedui.generated.resources.account_error_update_photo_failed
+import hikyaku.sharedui.generated.resources.auth_error_google_sign_in_failed
 import hikyaku.sharedui.generated.resources.auth_error_missing_credentials
 import hikyaku.sharedui.generated.resources.auth_error_missing_display_name
 import hikyaku.sharedui.generated.resources.auth_error_missing_email
@@ -265,6 +266,19 @@ class AuthViewModel(
         launchAuth {
             repository.signIn(e, password)
                 .onFailure { setError(getString(Res.string.auth_error_sign_in_failed)) }
+        }
+    }
+
+    /**
+     * Completes Google sign-in/sign-up from the [GoogleIdToken] obtained via
+     * [rememberGoogleIdTokenLauncher]. A failed [result] (including the user cancelling the
+     * account picker) is swallowed silently rather than shown as an error.
+     */
+    fun signInWithGoogle(result: Result<GoogleIdToken>) {
+        val token = result.getOrNull() ?: return
+        launchAuth {
+            repository.signInWithGoogle(token.idToken, token.rawNonce)
+                .onFailure { setError(getString(Res.string.auth_error_google_sign_in_failed)) }
         }
     }
 

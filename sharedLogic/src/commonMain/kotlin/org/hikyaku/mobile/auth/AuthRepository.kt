@@ -3,7 +3,9 @@ package org.hikyaku.mobile.auth
 import io.github.jan.supabase.SupabaseClient
 import io.github.jan.supabase.auth.OtpType
 import io.github.jan.supabase.auth.auth
+import io.github.jan.supabase.auth.providers.Google
 import io.github.jan.supabase.auth.providers.builtin.Email
+import io.github.jan.supabase.auth.providers.builtin.IDToken
 import io.github.jan.supabase.auth.status.SessionStatus
 import io.github.jan.supabase.storage.storage
 import kotlin.time.Clock
@@ -30,6 +32,15 @@ class AuthRepository(
         auth.signInWith(Email) {
             this.email = email
             this.password = password
+        }
+    }
+
+    /** Signs in (or, for a first-time Google account, signs up) with a Google ID token. */
+    suspend fun signInWithGoogle(idToken: String, nonce: String): Result<Unit> = runCatching {
+        auth.signInWith(IDToken) {
+            this.idToken = idToken
+            provider = Google
+            this.nonce = nonce
         }
     }
 
