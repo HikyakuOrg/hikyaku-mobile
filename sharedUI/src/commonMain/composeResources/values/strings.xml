@@ -205,6 +205,7 @@
     <string name="create_shift_label_location_name">Name (e.g. Home)</string>
     <string name="create_shift_label_search_address">Search address</string>
     <string name="create_shift_use_saved_location">Use a saved location instead</string>
+    <string name="warehouse_personal_org_limit_notice">Personal accounts are limited to one warehouse.</string>
     <string name="create_shift_label_address">Address</string>
     <string name="address_autocomplete_no_results">No address found</string>
     <string name="address_pick_on_map">Pick on map</string>

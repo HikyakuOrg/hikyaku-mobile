@@ -115,6 +115,7 @@ import hikyaku.sharedui.generated.resources.package_section_receiver
 import hikyaku.sharedui.generated.resources.package_section_sender
 import hikyaku.sharedui.generated.resources.package_submit
 import hikyaku.sharedui.generated.resources.phone_label_default
+import hikyaku.sharedui.generated.resources.warehouse_personal_org_limit_notice
 import org.hikyaku.mobile.geocode.model.AddressSuggestion
 import org.hikyaku.mobile.map.LocationPickerDialog
 import org.hikyaku.mobile.map.LocationPinIcon
@@ -667,8 +668,17 @@ private fun DetailsStep(
         state.warehouses.firstOrNull { it.id == state.selectedWarehouseId }?.let { selected ->
             WarehouseMap(lat = selected.lat, lng = selected.lng)
         }
-        TextButton(onClick = onStartAddWarehouse) {
-            Text(stringResource(Res.string.create_shift_add_new_location))
+        if (state.canAddWarehouse) {
+            TextButton(onClick = onStartAddWarehouse) {
+                Text(stringResource(Res.string.create_shift_add_new_location))
+            }
+        } else {
+            Text(
+                stringResource(Res.string.warehouse_personal_org_limit_notice),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = 4.dp),
+            )
         }
     } else {
         OutlinedTextField(
