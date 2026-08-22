@@ -1,0 +1,4 @@
+# Secrets and repository content. Do not commit these.
+.env
+data/
+rclone.conf

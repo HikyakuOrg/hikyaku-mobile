@@ -1,0 +1,21 @@
+# FDROID_SITE_ADDRESS controls the address and the TLS behaviour.
+#   apps.example.com  -> Caddy gets a Let's Encrypt certificate automatically.
+#   :80               -> plain HTTP. Use this behind your own reverse proxy.
+{$FDROID_SITE_ADDRESS} {
+	root * /srv
+	encode gzip
+	file_server browse
+
+	# The signed index is small and changes often. Keep the cache short.
+	@index path /fdroid/repo/index* /fdroid/repo/entry*
+	header @index Cache-Control "public, max-age=60"
+
+	# APK files never change under the same name, so cache them for a long time.
+	@apk path *.apk
+	header @apk Cache-Control "public, max-age=31536000, immutable"
+
+	# Defence in depth: the signing key and the configuration are not mounted
+	# into the web root, and these paths are also blocked here.
+	@secret path /fdroid/keystore.p12 /fdroid/config.yml /fdroid/repo-info.txt
+	respond @secret 404
+}

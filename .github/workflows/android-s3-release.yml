@@ -1,0 +1,169 @@
+name: Android release APK to S3
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Do not cancel a run that is already uploading. Queue instead.
+concurrency:
+  group: android-s3-release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PACKAGE_ID: org.hikyaku.mobile
+
+jobs:
+  build-and-upload:
+    name: Build signed APK and upload to S3
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Check the required secrets and variables
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+        run: |
+          missing=""
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD \
+                      ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD \
+                      AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
+            eval "value=\${$name}"
+            [ -n "$value" ] || missing="$missing $name"
+          done
+          [ -n "$S3_BUCKET" ] || missing="$missing S3_BUCKET(variable)"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets or variables:$missing"
+            exit 1
+          fi
+
+      - name: Write the release keystore
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          mkdir -p androidApp/keystore
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > androidApp/keystore/hikyaku-release.keystore
+          {
+            echo "storeFile=keystore/hikyaku-release.keystore"
+            echo "storePassword=$ANDROID_KEYSTORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > androidApp/keystore.properties
+
+      - name: Configure local.properties
+        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+
+      - name: Set the version info
+        run: |
+          echo "GIT_SHA=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+
+      - name: Build the release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew :androidApp:assembleRelease --stacktrace \
+            -PappVersionCode=${{ env.VERSION_CODE }} \
+            -PappVersionName=1.0.0-${{ env.GIT_SHA }}
+
+      - name: Find the APK and check the signature
+        run: |
+          apk=$(find androidApp/build/outputs/apk/release -name '*.apk' -type f 2>/dev/null | head -1 || true)
+          if [ -z "$apk" ]; then
+            echo "::error::No APK was produced."
+            exit 1
+          fi
+          echo "APK_PATH=$apk" >> "$GITHUB_ENV"
+          # F-Droid clients reject an APK that the repository key did not sign,
+          # so an unsigned build must not reach the bucket.
+          apksigner=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner -type f 2>/dev/null | sort -r | head -1 || true)
+          if [ -n "$apksigner" ]; then
+            "$apksigner" verify --print-certs "$apk"
+          else
+            echo "::warning::apksigner was not found. The signature was not checked."
+            case "$apk" in
+              *unsigned*) echo "::error::The APK file name says it is unsigned."; exit 1 ;;
+            esac
+          fi
+          ls -la "$apk"
+
+      - name: Upload the APK to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          # Set S3_PREFIX to a path that "fdroid deploy" does not mirror.
+          # That command runs "rclone sync --delete-after" against
+          # <bucket>/fdroid/repo, and it removes every file there that is not
+          # in the local data/repo directory.
+          S3_PREFIX: ${{ vars.S3_PREFIX || 'apks' }}
+          # Optional. Set this for Cloudflare R2, MinIO, Backblaze B2 or Wasabi.
+          S3_ENDPOINT_URL: ${{ vars.S3_ENDPOINT_URL }}
+        run: |
+          set -eu
+          endpoint=""
+          if [ -n "$S3_ENDPOINT_URL" ]; then
+            endpoint="--endpoint-url $S3_ENDPOINT_URL"
+          fi
+          # The F-Droid name format. It lets you move this file into an
+          # F-Droid repository without a rename.
+          name="${PACKAGE_ID}_${VERSION_CODE}.apk"
+          dest="s3://$S3_BUCKET/$S3_PREFIX/$name"
+
+          # shellcheck disable=SC2086
+          aws s3 cp "$APK_PATH" "$dest" $endpoint \
+            --content-type application/vnd.android.package-archive \
+            --cache-control "public, max-age=31536000, immutable" \
+            --no-progress
+
+          # A stable name for the most recent build.
+          # shellcheck disable=SC2086
+          aws s3 cp "$APK_PATH" "s3://$S3_BUCKET/$S3_PREFIX/latest.apk" $endpoint \
+            --content-type application/vnd.android.package-archive \
+            --cache-control "public, max-age=60" \
+            --no-progress
+
+          {
+            echo "### APK uploaded"
+            echo ""
+            echo "| Item | Value |"
+            echo "|---|---|"
+            echo "| Version code | \`$VERSION_CODE\` |"
+            echo "| Version name | \`1.0.0-$GIT_SHA\` |"
+            echo "| Object | \`$S3_PREFIX/$name\` |"
+            echo "| Bucket | \`$S3_BUCKET\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the APK as a workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: hikyaku-release-${{ env.VERSION_CODE }}
+          path: ${{ env.APK_PATH }}
+          if-no-files-found: error
+          retention-days: 30
