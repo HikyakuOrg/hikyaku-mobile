@@ -1,12 +1,13 @@
-# Self-hosted F-Droid repository.
+# Self-hosted F-Droid repository indexer.
 #
 #   1. Copy .env.example to .env and fill it in.
 #   2. Run: docker compose up -d
 #
-# The "fdroid" service signs and indexes the APK files. It can also send them
-# to an S3 bucket.
-# The "web" service publishes the repository from this host. It starts only
-# when COMPOSE_PROFILES contains "web".
+# The "fdroid" service signs and indexes the APK files, then sends the result
+# to an S3-compatible bucket. The bucket serves the repository publicly - see
+# FDROID.md. This is also what the CI workflow runs, in one-shot mode
+# (FDROID_SCAN_INTERVAL=0), on every push. Run it with `docker compose up -d`
+# locally only to test changes before they go through CI.
 
 services:
   fdroid:
@@ -24,7 +25,6 @@ services:
       FDROID_ARCHIVE_OLDER: ${FDROID_ARCHIVE_OLDER:-0}
       FDROID_MIRRORS: ${FDROID_MIRRORS:-}
       FDROID_SCAN_INTERVAL: ${FDROID_SCAN_INTERVAL:-60}
-      # S3. Leave FDROID_S3_BUCKET empty to keep the repository on this host.
       FDROID_S3_BUCKET: ${FDROID_S3_BUCKET:-}
       FDROID_RCLONE_REMOTE: ${FDROID_RCLONE_REMOTE:-}
       FDROID_S3_PULL_PREFIX: ${FDROID_S3_PULL_PREFIX:-}
@@ -35,28 +35,3 @@ services:
       # Holds config.yml, keystore.p12, repo/ and metadata/. Back this up.
       # An optional rclone.conf for a non-AWS S3 service also goes here.
       - ./data:/data
-
-  web:
-    image: caddy:2-alpine
-    container_name: fdroid-web
-    restart: unless-stopped
-    profiles: ["web"]
-    depends_on:
-      - fdroid
-    environment:
-      FDROID_SITE_ADDRESS: ${FDROID_SITE_ADDRESS:-:80}
-    ports:
-      - "${FDROID_HTTP_PORT:-80}:80"
-      - "${FDROID_HTTPS_PORT:-443}:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # Only the published directories are mounted. The signing key and
-      # config.yml stay outside the web root.
-      - ./data/repo:/srv/fdroid/repo:ro
-      - ./data/archive:/srv/fdroid/archive:ro
-      - caddy_data:/data
-      - caddy_config:/config
-
-volumes:
-  caddy_data:
-  caddy_config:

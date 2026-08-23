@@ -1,4 +1,4 @@
-name: Android release APK to S3
+name: Android release and F-Droid publish
 
 on:
   push:
@@ -167,3 +167,134 @@ jobs:
           path: ${{ env.APK_PATH }}
           if-no-files-found: error
           retention-days: 30
+
+      - name: Check the F-Droid indexing secrets and variables
+        env:
+          FDROID_KEYSTORE_BASE64: ${{ secrets.FDROID_KEYSTORE_BASE64 }}
+          FDROID_CONFIG_YML_BASE64: ${{ secrets.FDROID_CONFIG_YML_BASE64 }}
+          FDROID_BASE_URL: ${{ vars.FDROID_BASE_URL }}
+        run: |
+          missing=""
+          for name in FDROID_KEYSTORE_BASE64 FDROID_CONFIG_YML_BASE64; do
+            eval "value=\${$name}"
+            [ -n "$value" ] || missing="$missing $name"
+          done
+          [ -n "$FDROID_BASE_URL" ] || missing="$missing FDROID_BASE_URL(variable)"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets or variables:$missing"
+            echo "::error::See \"One-time setup\" in FDROID.md to bootstrap the repo signing key."
+            exit 1
+          fi
+
+      - name: Restore the F-Droid signing key
+        env:
+          FDROID_KEYSTORE_BASE64: ${{ secrets.FDROID_KEYSTORE_BASE64 }}
+          FDROID_CONFIG_YML_BASE64: ${{ secrets.FDROID_CONFIG_YML_BASE64 }}
+        run: |
+          set -eu
+          mkdir -p fdroid/data
+          printf '%s' "$FDROID_KEYSTORE_BASE64" | base64 -d > fdroid/data/keystore.p12
+          printf '%s' "$FDROID_CONFIG_YML_BASE64" | base64 -d > fdroid/data/config.yml
+          chmod 0600 fdroid/data/keystore.p12 fdroid/data/config.yml
+
+      - name: Restore the previous repository from S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          S3_ENDPOINT_URL: ${{ vars.S3_ENDPOINT_URL }}
+        run: |
+          set -eu
+          endpoint=""
+          if [ -n "$S3_ENDPOINT_URL" ]; then
+            endpoint="--endpoint-url $S3_ENDPOINT_URL"
+          fi
+          mkdir -p fdroid/data/repo fdroid/data/archive fdroid/data/metadata
+          # A CI runner starts empty each time, so the prior repo/archive must
+          # come back from the bucket first. Otherwise the mirror-publish step
+          # below would delete every previously released version.
+          # shellcheck disable=SC2086
+          aws s3 sync "s3://$S3_BUCKET/fdroid/repo" fdroid/data/repo $endpoint --no-progress
+          # shellcheck disable=SC2086
+          aws s3 sync "s3://$S3_BUCKET/fdroid/archive" fdroid/data/archive $endpoint --no-progress
+
+      - name: Restore the per-app metadata from git
+        run: |
+          set -eu
+          mkdir -p fdroid/data/metadata
+          if [ -d fdroid/metadata ]; then
+            cp -r fdroid/metadata/. fdroid/data/metadata/
+          fi
+
+      - name: Copy the release APK into the repository
+        run: |
+          set -eu
+          mkdir -p fdroid/data/repo
+          cp "$APK_PATH" "fdroid/data/repo/${PACKAGE_ID}_${VERSION_CODE}.apk"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Build the F-Droid indexer image
+        uses: docker/build-push-action@v7
+        with:
+          context: fdroid
+          tags: fdroid-repo:local
+          load: true
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Sign and index the repository
+        env:
+          FDROID_BASE_URL: ${{ vars.FDROID_BASE_URL }}
+          FDROID_REPO_NAME: ${{ vars.FDROID_REPO_NAME }}
+          FDROID_REPO_DESCRIPTION: ${{ vars.FDROID_REPO_DESCRIPTION }}
+          FDROID_MIRRORS: ${{ vars.FDROID_MIRRORS }}
+          FDROID_ARCHIVE_OLDER: ${{ vars.FDROID_ARCHIVE_OLDER || '0' }}
+        run: |
+          docker run --rm \
+            -v "$PWD/fdroid/data:/data" \
+            -e FDROID_BASE_URL \
+            -e FDROID_REPO_NAME \
+            -e FDROID_REPO_DESCRIPTION \
+            -e FDROID_MIRRORS \
+            -e FDROID_ARCHIVE_OLDER \
+            -e FDROID_SCAN_INTERVAL=0 \
+            fdroid-repo:local
+          # FDROID_S3_BUCKET is deliberately left unset above: this job
+          # publishes to S3 itself in the next step via the aws CLI, so the
+          # container does not need rclone credentials for a non-AWS host.
+
+      - name: Publish the repository to S3
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ vars.AWS_REGION || 'us-east-1' }}
+          S3_BUCKET: ${{ vars.S3_BUCKET }}
+          S3_ENDPOINT_URL: ${{ vars.S3_ENDPOINT_URL }}
+        run: |
+          set -eu
+          endpoint=""
+          if [ -n "$S3_ENDPOINT_URL" ]; then
+            endpoint="--endpoint-url $S3_ENDPOINT_URL"
+          fi
+          # Mirror operation, same semantics as "fdroid deploy": this removes
+          # bucket files that are not in data/repo or data/archive.
+          # shellcheck disable=SC2086
+          aws s3 sync fdroid/data/repo "s3://$S3_BUCKET/fdroid/repo" $endpoint --delete --no-progress
+          # shellcheck disable=SC2086
+          aws s3 sync fdroid/data/archive "s3://$S3_BUCKET/fdroid/archive" $endpoint --delete --no-progress
+          # Not part of the signed repo, but not sensitive either - this is
+          # exactly the URL and fingerprint that users are meant to receive.
+          # shellcheck disable=SC2086
+          aws s3 cp fdroid/data/repo-info.txt "s3://$S3_BUCKET/fdroid/repo-info.txt" $endpoint \
+            --content-type text/plain --cache-control "public, max-age=60" --no-progress
+
+          {
+            echo "### F-Droid repository updated"
+            echo ""
+            echo '```'
+            cat fdroid/data/repo-info.txt 2>/dev/null
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -10,18 +10,23 @@ This setup holds a **binary repository**. You supply the APK files. The server
 does not build apps from source code. Therefore the server does not need the
 full Android SDK, and the image stays small.
 
-You can publish the repository from this host, or to an S3 bucket, or to both.
+There is no long-running server. The GitHub Actions workflow builds and signs
+the app, then runs the indexer once to sign and update the repository, then
+publishes the result to an S3-compatible bucket. The bucket serves the
+repository directly. An optional Cloudflare Worker sits in front of the
+bucket to give it a custom domain and edge caching.
 
 All the files are in the `fdroid/` directory:
 
 | File | Function |
 |---|---|
-| `compose.yml` | The two services: the indexer and the web server. |
-| `Dockerfile` | The Alpine image that holds the `fdroidserver` tools. |
-| `entrypoint.sh` | The start-up steps of the indexer. |
-| `Caddyfile` | The web server rules. |
-| `.env.example` | The configuration template. Copy this file. |
-| `data/` | The signing key, the APK files and the index. |
+| `compose.yml` | Runs the indexer locally, for testing before a push. |
+| `Dockerfile` | The Alpine image that holds the `fdroidserver` tools. CI builds and runs this same image. |
+| `entrypoint.sh` | The steps the indexer runs: make/read the key, sign, write the index. |
+| `.env.example` | The configuration template for local testing. Copy this file. |
+| `metadata/` | Per-app metadata YAML, tracked in git. See section 5. |
+| `worker/` | The optional Cloudflare Worker that proxies the bucket. See section 9. |
+| `data/` | Local-only working directory: the signing key, the APK files and the index. Never committed. |
 
 ---
 
@@ -29,104 +34,127 @@ All the files are in the `fdroid/` directory:
 
 You must have these items:
 
-1. A Linux host with Docker Engine and the Compose plugin.
-2. Approximately 1 GB of disk space, plus the space for your APK files.
-3. A domain name, if you publish from this host and want automatic HTTPS.
-4. An S3 bucket and access keys, if you publish to S3.
-
-For automatic HTTPS you must also do these two steps:
-
-1. Point the DNS A record of the domain to the host.
-2. Open TCP port 80 and TCP port 443 on the firewall.
+1. An S3-compatible bucket with public read access, and access keys that can
+   write to it.
+2. Docker, to run `docker compose` once locally and bootstrap the signing key
+   (see section 4). You do not need Docker anywhere after that; CI builds and
+   runs the same image.
+3. Optionally, a Cloudflare account and a domain, if you want the repository
+   on your own domain instead of the bucket's raw URL. See section 9.
 
 ---
 
 ## 3. How it works
 
-The `fdroid` service does six steps at each start:
+On every push to `main`, the `.github/workflows/android-s3-release.yml`
+workflow does these steps, in the same job that builds the app:
 
-1. It makes a signing key, but only at the first start.
-2. It writes your `.env` values into `config.yml`.
-3. If the pull is on, it copies new APK files from the bucket into
-   `data/repo/`. See section 11.
-4. It signs the APK files in `data/repo/` and writes the index.
-5. If S3 is on, it sends `data/repo/` to the bucket.
-6. It then looks at `data/repo/` every 60 seconds. If the APK files change, it
-   repeats step 3 to step 5.
+1. It builds and signs the release APK, as before.
+2. It restores the repository's signing key from two GitHub secrets (section
+   4), and the previous `repo/` and `archive/` content from the bucket
+   (section 10), into a scratch `fdroid/data/` directory.
+3. It restores `fdroid/metadata/` (tracked in git) into `fdroid/data/metadata/`.
+4. It copies the APK it just built straight into `fdroid/data/repo/`.
+5. It builds the `fdroid/Dockerfile` image and runs it once
+   (`FDROID_SCAN_INTERVAL=0`): the indexer signs the APK files in
+   `data/repo/` and writes the index. It does not talk to S3 itself; the
+   workflow does that in the next step, so any S3-compatible endpoint works
+   without extra `rclone` configuration.
+6. It publishes `data/repo/` and `data/archive/` to the bucket with
+   `aws s3 sync --delete`, mirroring what the indexer just produced.
 
-The `web` service publishes `data/repo/` at `<your-url>/fdroid/repo`. This
-service starts only when `COMPOSE_PROFILES` contains `web`.
+The signing key never leaves the two GitHub secrets and the ephemeral CI
+runner. It is not part of `data/repo/`, so it is never uploaded to the
+bucket.
 
-The signing key stays in `data/keystore.p12`. This file is not in the web root,
-and the service does not send it to S3. Users cannot download it.
-
-The index is signed. Therefore the transport does not need to be secret. A
-public S3 bucket is safe, because the client app refuses an index with a wrong
-signature.
+The index is signed. Therefore the bucket can be fully public - a client
+rejects an index with the wrong signature.
 
 ---
 
-## 4. Install the repository
+## 4. One-time setup
 
-**Caution: Step 4 makes the signing key. Do the backup in section 7 as soon as
-the first start is complete.**
+**Caution: Step 1 makes the signing key. Back it up as soon as it exists -
+see section 7. If you lose it, you cannot update the repository; you must
+make a new one, and every user must remove the old repository and add the
+new one.**
 
-1. Go to the `fdroid` directory.
+1. Bootstrap the signing key locally.
 
    ```bash
    cd fdroid
-   ```
-
-2. Copy the configuration template.
-
-   ```bash
    cp .env.example .env
    ```
 
-3. Open `.env` in a text editor. Set the values. Section 8 gives the details of
-   each value.
-
-4. Start the services.
+   Open `.env` and set `FDROID_BASE_URL` (use your future Worker domain if
+   you're setting one up, otherwise the bucket's public URL) and
+   `FDROID_REPO_NAME`. Leave the S3 values empty for this step.
 
    ```bash
    docker compose up -d
+   docker compose logs fdroid
+   docker compose down
    ```
 
-   The first start takes 3 to 6 minutes. Docker builds the image in this time.
+   This creates `fdroid/data/keystore.p12` and `fdroid/data/config.yml`.
 
-5. Read the log to find the address of your repository.
+2. Turn those two files into GitHub repository secrets.
 
    ```bash
-   docker compose logs fdroid
+   base64 -w0 data/keystore.p12   # -> FDROID_KEYSTORE_BASE64
+   base64 -w0 data/config.yml     # -> FDROID_CONFIG_YML_BASE64
    ```
 
-   The log shows a line that starts with `Add URL:`. Keep this line.
+   Add both as **secrets** (Settings > Secrets and variables > Actions >
+   Secrets) on the GitHub repository, alongside the existing
+   `ANDROID_KEYSTORE_BASE64` and the AWS keys.
 
-The installation is now complete.
+3. Set the GitHub Actions **variables** (same page, Variables tab):
+
+   | Variable | Function |
+   |---|---|
+   | `FDROID_BASE_URL` | The public address users add to their F-Droid client. Your Worker's custom domain, or the bucket's public URL if you skip the Worker. |
+   | `FDROID_REPO_NAME` | The name the client app shows. Optional. |
+   | `FDROID_REPO_DESCRIPTION` | A short text about the repository. Optional. |
+   | `FDROID_MIRRORS` | Comma-separated fallback addresses. If `FDROID_BASE_URL` is your Worker domain, put the bucket's raw public URL here. Optional. |
+   | `FDROID_ARCHIVE_OLDER` | Versions to keep in the main repo before moving older ones to an archive. `0` (the default if unset) keeps every version. Optional. |
+   | `S3_BUCKET`, `S3_ENDPOINT_URL`, `AWS_REGION` | Already set for the APK upload step; reused here. |
+
+   `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` are the existing secrets;
+   the key needs write access to the `fdroid/` prefix in the bucket too.
+
+4. Push to `main`. The workflow builds the APK, then signs and publishes the
+   repository. Check the run's summary for the `Add URL` and fingerprint.
+
+5. Optionally, set up the Cloudflare Worker (section 9) so `FDROID_BASE_URL`
+   can be your own domain instead of the bucket's URL.
 
 ---
 
 ## 5. Add an app
 
-1. Copy the APK file into `fdroid/data/repo/`.
+Nothing to do for a normal release: pushing to `main` builds, signs and
+publishes automatically.
+
+To set the name, description, icon and screenshots the F-Droid client shows:
+
+1. The first time CI indexes a new package, it creates a blank metadata file
+   inside its own throwaway `data/metadata/`, but that copy is discarded
+   with the rest of the CI runner - it is not committed anywhere. Run the
+   indexer locally once to get a starting copy:
 
    ```bash
-   cp myapp-release.apk fdroid/data/repo/myapp_10203.apk
+   cd fdroid
+   docker compose up -d
+   docker compose logs fdroid
+   docker compose down
    ```
 
-   The name of the file is not important. But the format
-   `<package-name>_<version-code>.apk` helps you to find the file.
-
-2. Wait 60 seconds. The indexer finds the new file and writes a new index.
-
-   To do this immediately, use this command:
+2. Copy the generated file into the git-tracked directory and edit it:
 
    ```bash
-   docker compose exec fdroid fdroid update --create-metadata --pretty
+   cp data/metadata/org.hikyaku.mobile.yml metadata/org.hikyaku.mobile.yml
    ```
-
-3. Open `fdroid/data/metadata/<package-name>.yml`. The indexer made this file.
-   Set the fields that the users see:
 
    ```yaml
    AuthorName: Example Org
@@ -138,15 +166,27 @@ The installation is now complete.
    WebSite: https://example.com
    ```
 
-4. To add an icon and screenshots, make these files:
+3. Commit `fdroid/metadata/org.hikyaku.mobile.yml`. From then on, every CI
+   run restores this file before indexing, so your edits stick.
+
+4. To add an icon and screenshots, add these files locally under
+   `fdroid/data/repo/`, then let a normal push carry them to the bucket:
 
    ```
-   data/repo/<package-name>/en-US/icon.png
-   data/repo/<package-name>/en-US/phoneScreenshots/1.png
+   fdroid/data/repo/org.hikyaku.mobile/en-US/icon.png
+   fdroid/data/repo/org.hikyaku.mobile/en-US/phoneScreenshots/1.png
    ```
 
-**Note: To remove an app, delete the APK file and the metadata file. Then write
-a new index.**
+   Unlike the metadata YAML, these do not need git tracking: they live under
+   `data/repo/`, which CI already restores from and publishes back to the
+   bucket on every run (the same round-trip that keeps old APKs from being
+   deleted, section 3 step 2). Add them once - locally with `docker compose
+   up -d`, or by uploading them straight to `s3://<bucket>/fdroid/repo/...`
+   - and every future CI run keeps them.
+
+**Note: to remove an app, delete its APK naming convention from future
+releases and delete its metadata file. The already-published APK stays in
+the bucket until you manually delete it there.**
 
 ---
 
@@ -155,10 +195,11 @@ a new index.**
 The users need the address and the fingerprint. The fingerprint prevents an
 attack from a different server.
 
-Find the two values in this file:
+Find the two values in the latest workflow run's summary (Actions tab), or
+fetch them directly:
 
 ```bash
-cat fdroid/data/repo-info.txt
+curl https://<your-fdroid-base-url>/fdroid/repo-info.txt
 ```
 
 The file shows a link with this format:
@@ -173,8 +214,8 @@ Give this link to the users. The users then do these three steps:
 2. Open the link on the Android device.
 3. Touch **Add** in the F-Droid client.
 
-The users can also use the menu **Settings > Repositories > Add**. But the link
-is safer, because the link contains the fingerprint.
+The users can also use the menu **Settings > Repositories > Add**. But the
+link is safer, because the link contains the fingerprint.
 
 ---
 
@@ -184,352 +225,203 @@ is safer, because the link contains the fingerprint.
 must then make a new repository. All the users must remove the old repository
 and add the new one.**
 
-Back up these two files:
+The signing key lives in two places, and both matter:
 
-```
-fdroid/data/keystore.p12
-fdroid/data/config.yml
-```
+1. The GitHub repository secrets `FDROID_KEYSTORE_BASE64` and
+   `FDROID_CONFIG_YML_BASE64` (section 4). These are what CI uses. They are
+   **write-only** - GitHub never lets you read a secret's value back.
+2. Your own offline copy of `fdroid/data/keystore.p12` and
+   `fdroid/data/config.yml` from when you ran the bootstrap in section 4.
+   Keep the two files together, in a safe place (a password manager or an
+   encrypted archive). Do not put them in Git; `fdroid/.gitignore` prevents
+   this.
 
-The file `config.yml` holds the passwords of the keystore. Keep the two files
-together, and keep them in a safe place. Do not put them in Git. The file
-`fdroid/.gitignore` prevents this.
+If you only have (1) and GitHub's secrets are ever lost (repository deleted,
+secret rotated by mistake), you cannot recover the key - keep (2) regardless
+of how confident you are in GitHub's durability.
 
-To restore the repository, put the two files back into `fdroid/data/`. Then
-start the services. The indexer finds the key and keeps it.
+To restore after a local disaster, put the two files back into
+`fdroid/data/`, or re-add the two GitHub secrets from your offline copy - CI
+picks them up on the next push.
 
 ---
 
 ## 8. The configuration values
 
-Set these values in `fdroid/.env`.
+### GitHub Actions (used by every push)
 
-### Necessary values
+See section 4 for the full list of secrets and variables.
+
+### Local testing (`fdroid/.env`, used by `docker compose`)
 
 | Value | Function |
 |---|---|
-| `COMPOSE_PROFILES` | `web` starts the local web server. Make it empty to publish to S3 only. |
 | `FDROID_BASE_URL` | The public address of the repository. Do not add a path. The repository becomes `<value>/fdroid/repo`. |
-
-### Local web server
-
-These values apply only when `COMPOSE_PROFILES` contains `web`.
-
-| Value | Default | Function |
-|---|---|---|
-| `FDROID_SITE_ADDRESS` | `:80` | The address that the web server listens on. See section 9. |
-| `FDROID_HTTP_PORT` | `80` | The host port for HTTP. |
-| `FDROID_HTTPS_PORT` | `443` | The host port for HTTPS. |
-
-### S3
-
-| Value | Default | Function |
-|---|---|---|
-| `FDROID_S3_BUCKET` | empty | The name of the bucket. An empty value turns S3 off. |
-| `AWS_ACCESS_KEY_ID` | empty | The access key. |
-| `AWS_SECRET_ACCESS_KEY` | empty | The secret key. |
-| `FDROID_RCLONE_REMOTE` | empty | The section name in `data/rclone.conf`. See section 10. |
-| `FDROID_S3_PULL_PREFIX` | empty | The prefix in the bucket that holds the APK files from CI. An empty value turns the pull off. See section 11. |
-
-### Repository details
-
-| Value | Default | Function |
-|---|---|---|
-| `FDROID_REPO_NAME` | `My F-Droid Repo` | The name that the client app shows. |
-| `FDROID_REPO_DESCRIPTION` | — | A short text about the repository. |
-| `FDROID_REPO_ICON` | empty | The name of a PNG file in `data/`. |
-
-### Signing key
-
-**Note: The system uses these two values one time only, at the first start. A
-change after that start has no effect.**
-
-| Value | Default | Function |
-|---|---|---|
-| `FDROID_KEY_ALIAS` | `myrepo` | The name of the key in the keystore. |
-| `FDROID_KEY_DNAME` | — | The X.509 name of the certificate. |
-
-### Behaviour
-
-| Value | Default | Function |
-|---|---|---|
-| `FDROID_ARCHIVE_OLDER` | `0` | The number of recent versions to keep in the main repository. The older versions move to an archive. `0` keeps all the versions in the main repository. |
-| `FDROID_SCAN_INTERVAL` | `60` | The time between two checks of `data/repo/`, in seconds. `0` writes one index and then stops the container. |
-| `FDROID_MIRRORS` | empty | Other addresses that hold a copy. Put a comma between the items. |
-| `TZ` | `UTC` | The time zone of the container. |
+| `FDROID_S3_BUCKET` | The name of the bucket. Leave empty to index locally only, without publishing. |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | The access keys, for AWS S3 in `us-east-1`. |
+| `FDROID_RCLONE_REMOTE` | The section name in `data/rclone.conf`, for a non-AWS S3-compatible host. See section 10. |
+| `FDROID_S3_PULL_PREFIX` | Optional. A bucket prefix to copy APK files from before indexing. Unused by CI, which copies the freshly-built APK in directly. |
+| `FDROID_REPO_NAME`, `FDROID_REPO_DESCRIPTION`, `FDROID_REPO_ICON` | Repository details shown in the client app. |
+| `FDROID_KEY_ALIAS`, `FDROID_KEY_DNAME` | Used once, when the key is made on the first start. A change after that has no effect. |
+| `FDROID_ARCHIVE_OLDER` | Recent versions to keep in the main repository; `0` keeps every version. |
+| `FDROID_SCAN_INTERVAL` | Seconds between checks of `data/repo/`. `0` runs one time and stops - this is what CI uses. |
+| `FDROID_MIRRORS` | Other addresses that hold a copy. Comma-separated. |
 
 ---
 
-## 9. Publish from this host
+## 9. The Cloudflare Worker proxy
 
-Set `COMPOSE_PROFILES=web`.
+`fdroid/worker/` holds a small Worker that reverse-proxies the S3-compatible
+bucket. It exists only to give the repository a custom domain and edge
+caching; the bucket stays the source of truth and keeps serving the files
+directly. Because of that, you only deploy the Worker when you set it up or
+change its logic - never as part of a normal release.
 
-### A. Direct, with automatic HTTPS
+1. Set the bucket's public base URL in `fdroid/worker/wrangler.jsonc`:
 
-Use this way if the host is on the internet, and if ports 80 and 443 are free.
+   ```jsonc
+   "vars": {
+     "ORIGIN_BASE_URL": "https://my-bucket.s3.eu-west-1.example.com"
+   }
+   ```
 
-```ini
-COMPOSE_PROFILES=web
-FDROID_BASE_URL=https://apps.example.com
-FDROID_SITE_ADDRESS=apps.example.com
-```
+2. Deploy it:
 
-The web server gets a certificate from Let's Encrypt automatically. It also
-renews the certificate automatically.
+   ```bash
+   cd fdroid/worker
+   npm install
+   npx wrangler login
+   npx wrangler deploy
+   ```
 
-### B. Behind your own reverse proxy
+3. In the Cloudflare dashboard, add your domain as a custom domain on the
+   Worker (Workers & Pages > the Worker > Settings > Domains & Routes).
 
-Use this way if a different program already holds ports 80 and 443.
+4. Set `FDROID_BASE_URL` (GitHub Actions variable, section 4) to that domain,
+   and add the bucket's raw URL to `FDROID_MIRRORS` as a fallback. Push to
+   `main` to re-sign the index with the new URL.
 
-```ini
-COMPOSE_PROFILES=web
-FDROID_BASE_URL=https://apps.example.com
-FDROID_SITE_ADDRESS=:80
-FDROID_HTTP_PORT=8080
-FDROID_HTTPS_PORT=8443
-```
-
-Then send the path `/fdroid/` from your proxy to `http://127.0.0.1:8080`.
-
-`FDROID_BASE_URL` must show the address that the **users** see. It is not the
-address of the container.
+The Worker only forwards `GET`/`HEAD`, sets the same cache lifetimes the
+repository needs (short for the index, which changes every release; long and
+immutable for APK files, which never change under the same name), and
+refuses to forward a request for the signing key or its config even though
+CI never uploads those to the bucket in the first place. It holds no files
+itself and needs no secrets, since the bucket is public read.
 
 ---
 
 ## 10. Publish to S3
 
-The indexer signs the files on this host. It then sends them to the bucket with
-`rclone`. The files go to `<bucket>/fdroid/repo/`.
-
-**Caution: This is a mirror operation. `rclone` removes the files in
-`<bucket>/fdroid/` that are not in `data/repo/`. Do not keep other data under
-that prefix.**
-
 The bucket must permit public read access for the `fdroid/` prefix. The index
 is signed, so public read access is safe.
 
-### A. AWS S3, region us-east-1
+### A. AWS S3, or a generic S3-compatible host, from CI
 
-This is the simplest configuration. Two keys are sufficient.
+This is what the GitHub Actions workflow uses (section 3). It publishes with
+the AWS CLI's `--endpoint-url`, so any S3-compatible host works - set
+`S3_ENDPOINT_URL` and `AWS_REGION` as GitHub Actions variables. No `rclone`
+configuration is needed for this path.
+
+### B. From the indexer directly, for local testing
+
+`docker compose` (section 4, 5, 11) uses the indexer's own S3 support
+instead, since there is no separate publish step locally.
+
+For AWS S3 in `us-east-1`, two keys in `.env` are sufficient. For a different
+region or a different S3-compatible host (MinIO, Cloudflare R2, Backblaze B2,
+Wasabi, ...), make `fdroid/data/rclone.conf`:
 
 ```ini
-COMPOSE_PROFILES=
-FDROID_BASE_URL=https://my-bucket.s3.amazonaws.com
-FDROID_S3_BUCKET=my-bucket
-AWS_ACCESS_KEY_ID=AKIA...
-AWS_SECRET_ACCESS_KEY=...
+[myhost]
+type = s3
+provider = Other
+region = auto
+endpoint = https://s3.example.com
+access_key_id = ...
+secret_access_key = ...
 ```
 
-### B. A different region, or a different S3 service
+and set `FDROID_RCLONE_REMOTE=myhost` in `.env`.
 
-`fdroidserver` uses the region `us-east-1` and the AWS endpoint if you give the
-keys only. For a different region, or for MinIO, Cloudflare R2, Backblaze B2 or
-Wasabi, you must supply an `rclone` configuration file.
-
-1. Make the file `fdroid/data/rclone.conf`. Use one of these examples.
-
-   AWS S3, a different region:
-
-   ```ini
-   [aws-eu]
-   type = s3
-   provider = AWS
-   region = eu-west-1
-   access_key_id = AKIA...
-   secret_access_key = ...
-   ```
-
-   Cloudflare R2:
-
-   ```ini
-   [r2]
-   type = s3
-   provider = Cloudflare
-   region = auto
-   endpoint = https://<account-id>.r2.cloudflarestorage.com
-   access_key_id = ...
-   secret_access_key = ...
-   ```
-
-   MinIO:
-
-   ```ini
-   [minio]
-   type = s3
-   provider = Minio
-   endpoint = https://minio.example.com
-   access_key_id = ...
-   secret_access_key = ...
-   ```
-
-2. Set the section name in `.env`:
-
-   ```ini
-   FDROID_S3_BUCKET=my-bucket
-   FDROID_RCLONE_REMOTE=r2
-   ```
-
-3. Set `FDROID_BASE_URL` to the public read address of the bucket. For R2 this
-   is the public bucket URL or your custom domain.
-
-**Note: `data/rclone.conf` holds your keys. The service does not send this file
-to the bucket, and the web server does not publish it. Keep it out of Git.**
-
-### C. Both this host and S3
-
-Set `COMPOSE_PROFILES=web` and `FDROID_S3_BUCKET` together. The host then
-serves the repository, and the bucket holds a copy. Put the address that the
-users see in `FDROID_BASE_URL`, and put the other address in `FDROID_MIRRORS`.
+**Note: `data/rclone.conf` holds your keys. It is not committed, and not
+published.**
 
 ---
 
-## 11. Get the APK files from the CI job
+## 11. Test locally before you push
 
-The file `.github/workflows/android-s3-release.yml` builds a signed APK at each
-push to the `main` branch. It puts the APK in `<bucket>/apks/`.
+Do these commands in the `fdroid` directory, after `cp .env.example .env`
+and filling it in (section 4).
 
-To publish those APK files to your users, set the prefix in `.env`:
-
-```ini
-FDROID_S3_BUCKET=my-bucket
-FDROID_S3_PULL_PREFIX=apks
-AWS_ACCESS_KEY_ID=AKIA...
-AWS_SECRET_ACCESS_KEY=...
-```
-
-The indexer then does these steps every 60 seconds:
-
-1. It copies new APK files from `<bucket>/apks/` into `data/repo/`.
-2. It signs them and writes a new index.
-3. It sends the result to `<bucket>/fdroid/repo/`.
-
-The users get the new version at the next update check of the client app.
-
-**Note: The copy operation never deletes a local file. To remove an app from
-the repository, delete the APK file in `data/repo/` and delete the file in
-`<bucket>/apks/`. If you delete only the local file, the next pull brings it
-back.**
-
-The step ignores the file `latest.apk`, because that file is a copy of a file
-that already has a version number in its name.
-
-The two prefixes must stay separate. `fdroid deploy` mirrors `data/repo/` to
-`<bucket>/fdroid/repo/` with `rclone sync --delete-after`. If the CI job wrote
-to `fdroid/repo/`, that command would delete the files. Each APK therefore uses
-space in the bucket two times: one time in `apks/`, and one time in
-`fdroid/repo/`.
-
-**Note: The pull uses the AWS region `us-east-1`, the same as `fdroid deploy`.
-For a different region or a different S3 service, use `data/rclone.conf` and
-`FDROID_RCLONE_REMOTE`. Section 10 gives an example.**
-
----
-
-## 12. Usual tasks
-
-Do these commands in the `fdroid` directory.
-
-Show the log of the indexer:
+Run the indexer once, the same way CI does:
 
 ```bash
-docker compose logs -f fdroid
+docker compose run --rm -e FDROID_SCAN_INTERVAL=0 fdroid
 ```
 
-Write a new index immediately:
-
-```bash
-docker compose exec fdroid fdroid update --create-metadata --pretty
-```
-
-Send the repository to S3 immediately:
-
-```bash
-docker compose exec fdroid fdroid deploy --verbose
-```
-
-Show the address and the fingerprint again:
+Show the address and the fingerprint:
 
 ```bash
 cat data/repo-info.txt
 ```
 
-Apply a change that you made in `.env`:
-
-```bash
-docker compose up -d
-```
-
-Stop the repository:
-
-```bash
-docker compose down
-```
-
-Update the `fdroidserver` tools to the current version:
+Rebuild the image after changing the `Dockerfile`:
 
 ```bash
 docker compose build --no-cache fdroid
 ```
 
-To use a different version of the tools, change the `ARG` values at the top of
-the `Dockerfile`. Do not use a `33.x` value for `BUILD_TOOLS_VERSION`. That
-version of `apksigner` accepts invalid signatures, and `fdroidserver` ignores
-it.
+To use a different version of the tools, change the `ARG` values at the top
+of the `Dockerfile`. Do not use a `33.x` value for `BUILD_TOOLS_VERSION`.
+That version of `apksigner` accepts invalid signatures, and `fdroidserver`
+ignores it.
 
 ---
 
-## 13. Problems and solutions
+## 12. Problems and solutions
 
-**The container stops immediately. The log shows `FDROID_BASE_URL is not set`.**
-The file `.env` does not exist, or the value is empty. Copy `.env.example` to
-`.env`. Then set the value.
-
-**The build stops at the `apksigner --version` step.**
-The download of the Android build-tools failed, or the version does not exist.
-Check the access to `dl.google.com`. Then set a different
-`BUILD_TOOLS_VERSION` in the `Dockerfile`.
+**The GitHub Actions run fails at "Check the F-Droid indexing secrets and
+variables".**
+`FDROID_KEYSTORE_BASE64`, `FDROID_CONFIG_YML_BASE64` or `FDROID_BASE_URL` is
+missing. Run the one-time setup in section 4.
 
 **The client app shows an unsigned repository, or a fingerprint error.**
-The signing key changed. This occurs if you deleted `data/keystore.p12`. Restore
-the key from your backup. If you have no backup, the users must remove the
+The signing key changed. This happens if the two GitHub secrets were
+regenerated instead of restored from a backup. Restore them from your
+offline copy (section 7). If you have no backup, the users must remove the
 repository and add the new link.
 
 **The client app does not show a new app.**
-Read the log with `docker compose logs fdroid`. Usually the APK file has no
-metadata file. Write a new index with the `--create-metadata` option.
+Check the workflow run's log for the "Sign and index the repository" step.
+Usually the APK file has no metadata file yet - see section 5.
 
-**The log shows `S3 is on, but there are no credentials`.**
-Set `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. Or make
-`data/rclone.conf` and set `FDROID_RCLONE_REMOTE`.
+**Metadata edits keep disappearing.**
+Metadata must be committed under `fdroid/metadata/`, not edited only in a
+local `data/metadata/` - that directory is never committed and CI never sees
+it. See section 5.
 
-**The log shows `data/rclone.conf is present, but FDROID_RCLONE_REMOTE is
-empty`.**
-`fdroidserver` needs the name of the section to use. Set
-`FDROID_RCLONE_REMOTE` to a section name from that file.
+**The workflow's S3 steps fail with an access error.**
+Check `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` have write access to the
+`fdroid/` prefix in the bucket, and that `S3_ENDPOINT_URL` / `AWS_REGION`
+match your host.
 
-**The log shows `The pull from S3 failed`.**
-The indexer continues with the local files. Check the keys, and check that the
-prefix in `FDROID_S3_PULL_PREFIX` exists in the bucket. Read the full error
-with `docker compose logs fdroid`.
+**The build stops at the `apksigner --version` step.**
+The download of the Android build-tools failed, or the version does not
+exist. Check the access to `dl.google.com`. Then set a different
+`BUILD_TOOLS_VERSION` in the `Dockerfile`.
 
-**The upload to S3 fails with an access error.**
-Check the keys. Check that the key has write access to the bucket. For a
-non-AWS service, check the `endpoint` value in `data/rclone.conf`.
-
-**The web server does not get a certificate.**
-Check the DNS record of the domain. Check that port 80 is open. Let's Encrypt
-uses port 80 for the challenge. Read the log with `docker compose logs web`.
-
-**The port 80 is already in use.**
-A different program holds the port. Use way B in section 9.
+**The Worker returns an error or stale content.**
+The Worker only proxies the bucket; check the bucket directly at its raw
+URL first. If that works but the Worker doesn't, check `ORIGIN_BASE_URL` in
+`fdroid/worker/wrangler.jsonc` matches the bucket's public URL, and redeploy
+with `npx wrangler deploy`.
 
 ---
 
-## 14. References
+## 13. References
 
 - [Setup an F-Droid App Repo](https://f-droid.org/docs/Setup_an_F-Droid_App_Repo/)
 - [Installing the Server and Repo Tools](https://f-droid.org/docs/Installing_the_Server_and_Repo_Tools/)
 - [Signing Process](https://f-droid.org/docs/Signing_Process/)
 - [fdroidserver source and config.yml example](https://github.com/f-droid/fdroidserver)
-- [F-Droid sdkmanager](https://gitlab.com/fdroid/sdkmanager)
-- [rclone S3 configuration](https://rclone.org/s3/)
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/)

@@ -1,0 +1,16 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "hikyaku-fdroid-proxy",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-23",
+  "observability": {
+    "enabled": true
+  },
+  "vars": {
+    // Public base URL of the S3-compatible bucket that holds the signed
+    // F-Droid repository, i.e. what FDROID_BASE_URL pointed at before this
+    // Worker existed. No trailing slash. Example:
+    //   "https://my-bucket.s3.eu-west-1.example.com"
+    "ORIGIN_BASE_URL": "https://REPLACE-WITH-YOUR-BUCKET-PUBLIC-URL"
+  }
+}
