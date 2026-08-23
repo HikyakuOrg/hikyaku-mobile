@@ -13,10 +13,11 @@ DATA=/data
 CONFIG="$DATA/config.yml"
 KEYSTORE="$DATA/keystore.p12"
 INFO="$DATA/repo-info.txt"
+CONFIGURE=/usr/local/lib/fdroid-configure.py
 
 : "${FDROID_BASE_URL:?FDROID_BASE_URL is not set. Set it in the .env file.}"
 
-# export is necessary: the Python step below reads these from the environment.
+# export is necessary: configure.py reads these from the environment.
 export FDROID_REPO_NAME="${FDROID_REPO_NAME:-My F-Droid Repo}"
 export FDROID_REPO_DESCRIPTION="${FDROID_REPO_DESCRIPTION:-A privately hosted F-Droid repository.}"
 export FDROID_REPO_ICON="${FDROID_REPO_ICON:-}"
@@ -90,64 +91,7 @@ fi
 # Step 2 - every start: copy the .env values into config.yml.
 # The key alias and the passwords stay unchanged.
 # ---------------------------------------------------------------------------
-python3 - <<'PY_EOF'
-import os
-import pathlib
-import yaml
-
-path = pathlib.Path("/data/config.yml")
-cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-
-# Set on the first start only, because fdroid init does not write the
-# passwords when the keystore already exists.
-new_pass = os.environ.get("NEW_KEYSTORE_PASS", "")
-if new_pass:
-    cfg["keystorepass"] = new_pass
-    cfg["keypass"] = new_pass
-
-cfg["keystore"] = "/data/keystore.p12"
-cfg["repo_url"] = os.environ["REPO_URL"]
-cfg["repo_name"] = os.environ["FDROID_REPO_NAME"]
-cfg["repo_description"] = os.environ["FDROID_REPO_DESCRIPTION"]
-
-icon = os.environ.get("FDROID_REPO_ICON", "").strip()
-if icon:
-    cfg["repo_icon"] = icon
-
-# archive_older = 0 turns the archive off. fdroid then keeps every version
-# in the main repository.
-older = int(os.environ.get("FDROID_ARCHIVE_OLDER", "0") or 0)
-if older > 0:
-    cfg["archive_older"] = older
-    cfg["archive_url"] = os.environ["ARCHIVE_URL"]
-    cfg["archive_name"] = os.environ["FDROID_REPO_NAME"] + " (Archive)"
-    cfg["archive_description"] = "Older versions of the apps in this repository."
-else:
-    for key in ("archive_older", "archive_url", "archive_name", "archive_description"):
-        cfg.pop(key, None)
-
-mirrors = [m.strip() for m in os.environ.get("FDROID_MIRRORS", "").split(",") if m.strip()]
-if mirrors:
-    cfg["mirrors"] = mirrors
-else:
-    cfg.pop("mirrors", None)
-
-# S3. fdroid deploy sends the files to <bucket>/fdroid/repo with rclone.
-bucket = os.environ.get("FDROID_S3_BUCKET", "").strip()
-remote = os.environ.get("FDROID_RCLONE_REMOTE", "").strip()
-if bucket:
-    cfg["awsbucket"] = bucket
-    if remote:
-        cfg["rclone_config"] = [remote]
-    else:
-        cfg.pop("rclone_config", None)
-else:
-    cfg.pop("awsbucket", None)
-    cfg.pop("rclone_config", None)
-
-path.write_text(yaml.safe_dump(cfg, default_flow_style=False, sort_keys=True), encoding="utf-8")
-print("[fdroid] config.yml updated from the .env file.")
-PY_EOF
+python3 "$CONFIGURE" apply
 
 # fdroid stops if other users can read the secrets.
 chmod 0600 "$CONFIG"
@@ -188,8 +132,8 @@ fi
 # ---------------------------------------------------------------------------
 # Step 3 - read the key fingerprint. Users need it to add the repository.
 # ---------------------------------------------------------------------------
-KEY_ALIAS=$(python3 -c "import yaml;print(yaml.safe_load(open('/data/config.yml'))['repo_keyalias'])")
-KEY_PASS=$(python3 -c "import yaml;print(yaml.safe_load(open('/data/config.yml'))['keystorepass'])")
+KEY_ALIAS=$(python3 "$CONFIGURE" get repo_keyalias)
+KEY_PASS=$(python3 "$CONFIGURE" get keystorepass)
 
 FINGERPRINT=$(FDROID_KEY_STORE_PASS="$KEY_PASS" keytool -list -v \
     -keystore "$KEYSTORE" -storetype pkcs12 \

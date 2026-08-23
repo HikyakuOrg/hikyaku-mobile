@@ -54,8 +54,11 @@ RUN set -eux; \
     fdroid --version
 
 COPY entrypoint.sh /usr/local/bin/fdroid-entrypoint
+COPY configure.py /usr/local/lib/fdroid-configure.py
 # Remove the CR characters, in case of a checkout on Windows.
-RUN sed -i 's/\r$//' /usr/local/bin/fdroid-entrypoint \
+RUN sed -i 's/\r$//' \
+      /usr/local/bin/fdroid-entrypoint \
+      /usr/local/lib/fdroid-configure.py \
  && chmod 0755 /usr/local/bin/fdroid-entrypoint
 
 WORKDIR /data
