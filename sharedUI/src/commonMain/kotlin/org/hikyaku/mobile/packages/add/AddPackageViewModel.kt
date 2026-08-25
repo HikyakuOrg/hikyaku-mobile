@@ -33,6 +33,7 @@ import org.hikyaku.mobile.shift.create.model.CustomerSuggestion
 import org.hikyaku.mobile.shift.create.model.ShiftCustomerInput
 import org.hikyaku.mobile.shift.create.model.WarehouseOption
 import org.hikyaku.mobile.util.combineDateAndTimeToIsoUtc
+import org.hikyaku.mobile.warehouse.canAddWarehouse
 import org.jetbrains.compose.resources.getString
 
 /** Which party a customer-field edit applies to. */
@@ -59,6 +60,8 @@ data class AddPackageUiState(
     val warehouses: List<WarehouseOption> = emptyList(),
     val selectedWarehouseId: String? = null,
     val addingWarehouse: Boolean = false,
+    /** False once a personal org has reached [org.hikyaku.mobile.warehouse.PERSONAL_ORG_WAREHOUSE_LIMIT]. */
+    val canAddWarehouse: Boolean = true,
     val warehouseName: String = "",
     val warehouseQuery: String = "",
     val warehouseSuggestions: List<AddressSuggestion> = emptyList(),
@@ -78,6 +81,7 @@ data class AddPackageUiState(
  */
 class AddPackageViewModel(
     private val orgId: String,
+    private val isPersonalOrg: Boolean,
     private val repository: PackageRepository = PackageRepository(),
     private val geocodeRepository: GeocodeRepository = GeocodeRepository(),
 ) : ViewModel() {
@@ -102,11 +106,13 @@ class AddPackageViewModel(
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
             val warehouses = repository.fetchWarehouses(orgId).getOrDefault(emptyList())
+            val canAdd = canAddWarehouse(isPersonalOrg, warehouses.size)
             _state.value = _state.value.copy(
                 isLoading = false,
                 warehouses = warehouses,
                 selectedWarehouseId = warehouses.singleOrNull()?.id,
-                addingWarehouse = warehouses.isEmpty(),
+                addingWarehouse = warehouses.isEmpty() && canAdd,
+                canAddWarehouse = canAdd,
             )
         }
     }
@@ -247,6 +253,7 @@ class AddPackageViewModel(
     }
 
     fun startAddWarehouse() {
+        if (!_state.value.canAddWarehouse) return
         _state.value = _state.value.copy(addingWarehouse = true, selectedWarehouseId = null)
     }
 

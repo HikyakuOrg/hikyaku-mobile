@@ -188,6 +188,7 @@ fun MainNavGraph(
                     CreateShiftViewModel(
                         orgId = homeState.selectedOrgId.orEmpty(),
                         orgSlug = homeState.selectedOrganisation?.slug.orEmpty(),
+                        isPersonalOrg = homeState.selectedOrganisation?.isPersonal == true,
                     )
                 }
                 // Set by AddVehicleRoute's onDone, so returning from a successful add refreshes the vehicle list.
@@ -326,7 +327,10 @@ fun MainNavGraph(
             }
             composable<AddPackageRoute> {
                 val addPackageViewModel: AddPackageViewModel = viewModel {
-                    AddPackageViewModel(orgId = homeState.selectedOrgId.orEmpty())
+                    AddPackageViewModel(
+                        orgId = homeState.selectedOrgId.orEmpty(),
+                        isPersonalOrg = homeState.selectedOrganisation?.isPersonal == true,
+                    )
                 }
                 AddPackageScreen(
                     viewModel = addPackageViewModel,

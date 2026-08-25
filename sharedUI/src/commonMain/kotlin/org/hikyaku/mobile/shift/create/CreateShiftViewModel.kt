@@ -44,6 +44,7 @@ import org.hikyaku.mobile.shift.create.model.ShiftSubmission
 import org.hikyaku.mobile.shift.create.model.VehicleOption
 import org.hikyaku.mobile.shift.create.model.WarehouseOption
 import org.hikyaku.mobile.util.combineDateAndTimeToIsoUtc
+import org.hikyaku.mobile.warehouse.canAddWarehouse
 import org.jetbrains.compose.resources.getString
 
 /** Steps of the create-shift wizard. */
@@ -83,6 +84,8 @@ data class CreateShiftUiState(
     val warehouses: List<WarehouseOption> = emptyList(),
     val selectedWarehouseId: String? = null,
     val addingWarehouse: Boolean = false,
+    /** False once a personal org has reached [org.hikyaku.mobile.warehouse.PERSONAL_ORG_WAREHOUSE_LIMIT]. */
+    val canAddWarehouse: Boolean = true,
     val warehouseName: String = "",
     val warehouseQuery: String = "",
     val warehouseSuggestions: List<AddressSuggestion> = emptyList(),
@@ -123,6 +126,7 @@ data class CreateShiftUiState(
 class CreateShiftViewModel(
     private val orgId: String,
     private val orgSlug: String,
+    private val isPersonalOrg: Boolean,
     private val repository: CreateShiftRepository = CreateShiftRepository(),
     private val geocodeRepository: GeocodeRepository = GeocodeRepository(),
     private val packageRepository: PackageRepository = PackageRepository(),
@@ -215,13 +219,15 @@ class CreateShiftViewModel(
             } else {
                 warehouses.singleOrNull()?.id
             }
+            val canAdd = canAddWarehouse(isPersonalOrg, warehouses.size)
             _state.value = _state.value.copy(
                 isLoading = false,
                 vehicles = vehicles,
                 selectedVehicleId = selectedVehicleId,
                 warehouses = warehouses,
                 selectedWarehouseId = selectedWarehouseId,
-                addingWarehouse = restoredDraft?.addingWarehouse ?: warehouses.isEmpty(),
+                addingWarehouse = (restoredDraft?.addingWarehouse ?: warehouses.isEmpty()) && canAdd,
+                canAddWarehouse = canAdd,
             )
             // Resume mid-flow: the draft may have already moved past Details, so the picked
             // packages for its resolved warehouse need to be reloaded (availablePackages isn't
@@ -259,6 +265,7 @@ class CreateShiftViewModel(
     }
 
     fun startAddWarehouse() {
+        if (!_state.value.canAddWarehouse) return
         _state.value = _state.value.copy(addingWarehouse = true, selectedWarehouseId = null)
     }
 
