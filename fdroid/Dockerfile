@@ -30,6 +30,7 @@ RUN set -eux; \
         libmagic \
         rclone \
         git \
+        gnupg \
         bash coreutils findutils \
         ca-certificates tzdata; \
     python3 -m venv /opt/venv; \
