@@ -27,7 +27,7 @@ import kotlinx.serialization.encoding.*
  * @param status Run lifecycle state, e.g. `queued`, `failed`, `skipped`.
  * @param requestedAt When the run was requested.
  * @param optimisationId vrp_optimization.id once the run has produced one.
- * @param error Failure detail when status is `failed`.
+ * @param error Failure detail when status is `failed`, or the reason no packages were eligible when status is `skipped`. Always null otherwise.
  * @param nextAllowedAt Earliest time another run is allowed. Null when this run does not count toward the rate limit (failed or skipped).
  */
 @Serializable
@@ -45,7 +45,7 @@ data class LatestOptimisationRunDto (
     /* vrp_optimization.id once the run has produced one. */
     @SerialName(value = "optimisationId") @Required val optimisationId: kotlin.String?,
 
-    /* Failure detail when status is `failed`. */
+    /* Failure detail when status is `failed`, or the reason no packages were eligible when status is `skipped`. Always null otherwise. */
     @SerialName(value = "error") @Required val error: kotlin.String?,
 
     /* Earliest time another run is allowed. Null when this run does not count toward the rate limit (failed or skipped). */

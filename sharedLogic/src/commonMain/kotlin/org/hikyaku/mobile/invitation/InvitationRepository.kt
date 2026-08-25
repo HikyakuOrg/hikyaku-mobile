@@ -8,8 +8,8 @@ import io.ktor.client.request.get
 import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.statement.bodyAsText
-import kotlinx.serialization.SerialName
-import kotlinx.serialization.Serializable
+import org.hikyaku.mobile.api.generated.models.AcceptInvitationResultDto
+import org.hikyaku.mobile.api.generated.models.PendingInvitationDto
 import org.hikyaku.mobile.auth.SupabaseClientProvider
 import org.hikyaku.mobile.invitation.model.Invitation
 import org.hikyaku.mobile.net.ApiConfigProvider
@@ -22,12 +22,6 @@ import kotlin.coroutines.cancellation.CancellationException
  * The invitee side of team invitations: checking for, accepting, and declining invitations
  * addressed to the signed-in user's own verified email. Sending invitations is an org-admin
  * action that stays on the web dashboard, so that endpoint has no client here.
- *
- * `GET /invitations/pending`, `POST /invitations/{id}/accept` and `.../decline` aren't
- * documented with request/response schemas in the pinned OpenAPI spec (only the web-only
- * `POST /invitations` create endpoint is), so unlike the app's other `hikyaku-api` repositories
- * this one's wire DTOs are hand-written below rather than generated — there's nothing for the
- * swagger plugin to generate from. Shapes are taken from the `hikyaku`/`hikyaku-api` source.
  */
 class InvitationRepository(
     private val client: SupabaseClient = SupabaseClientProvider.client,
@@ -60,7 +54,7 @@ class InvitationRepository(
             header(ApiHeaders.AUTHORIZATION, ApiHeaders.bearer(accessToken()))
         }
         when {
-            response.status.value in 200..299 -> response.body<AcceptInvitationResponseDto>().let {
+            response.status.value in 200..299 -> response.body<AcceptInvitationResultDto>().let {
                 AcceptedInvitation(organisationId = it.organisationId, organisationSlug = it.organisationSlug)
             }
             response.status.value == 403 -> throw EmailNotVerifiedException()
@@ -106,24 +100,3 @@ class InvitationUnavailableException : Exception("This invitation is no longer a
 
 /** The organisation [InvitationRepository.accept] created the caller's membership in. */
 data class AcceptedInvitation(val organisationId: String, val organisationSlug: String)
-
-@Serializable
-private data class PendingInvitationDto(
-    val id: String,
-    val organisation: InvitationOrganisationDto,
-    val role: String,
-    val permissions: List<String> = emptyList(),
-)
-
-@Serializable
-private data class InvitationOrganisationDto(
-    val id: String,
-    val slug: String,
-    val name: String,
-)
-
-@Serializable
-private data class AcceptInvitationResponseDto(
-    @SerialName("organisation_id") val organisationId: String,
-    @SerialName("organisation_slug") val organisationSlug: String,
-)

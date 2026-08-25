@@ -12,7 +12,7 @@ client models" section there), using the OpenAPI generator Gradle plugin.
 
 ## What's wired into the app
 
-The mobile app calls **6** of the 35 documented endpoints, so only the request/response DTOs for
+The mobile app calls **9** of the 47 documented endpoints, so only the request/response DTOs for
 those are compiled. `./gradlew syncModels` regenerates the full client into a build-directory
 scratch dir, then syncs the DTOs the app uses straight into
 `sharedLogic/src/commonMain/kotlin/org/hikyaku/mobile/api/generated/models/` (package
@@ -27,6 +27,9 @@ scratch dir, then syncs the DTOs the app uses straight into
 | `POST /api/v1/optimisation/adhoc` | `CreateShiftRepository` | `AdhocOptimisationDto` → `AdhocOptimisationResultDto` |
 | `POST /api/v1/optimisation/run` | `OptimisationRepository` | `RunOptimisationDto` (+ `SetOffOverrideDto`) → `RunOptimisationResultDto` |
 | `GET /api/v1/optimisation/run/latest` | `OptimisationRepository` | `LatestOptimisationRunDto` |
+| `GET /api/v1/invitations/pending` | `InvitationRepository` | `PendingInvitationDto` (+ `InvitationOrganisationDto`) |
+| `POST /api/v1/invitations/{id}/accept` | `InvitationRepository` | `AcceptInvitationResultDto` |
+| `POST /api/v1/invitations/{id}/decline` | `InvitationRepository` | — (2xx/404 status code alone tells the caller everything the body would) |
 
 The repositories keep calling through the app's shared `appHttpClient` / `ApiEndpoints`; only the
 wire DTOs are generated (the generator's parallel `ApiClient` runtime and the 30 unused endpoint

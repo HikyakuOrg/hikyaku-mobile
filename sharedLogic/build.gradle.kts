@@ -94,6 +94,7 @@ val hikyakuApiAppModels = listOf(
     "RouteRequestDto", "RoutePreviewDto", "RouteLegDto", "RouteSummaryDto",
     "AdhocOptimisationDto", "AdhocOptimisationResultDto",
     "RunOptimisationDto", "RunOptimisationResultDto", "LatestOptimisationRunDto", "SetOffOverrideDto",
+    "PendingInvitationDto", "InvitationOrganisationDto", "AcceptInvitationResultDto",
 )
 
 val refreshHikyakuApiSpec by tasks.registering {
