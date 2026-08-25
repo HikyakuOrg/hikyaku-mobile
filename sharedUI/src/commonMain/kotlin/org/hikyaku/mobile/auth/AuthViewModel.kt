@@ -24,6 +24,10 @@ import hikyaku.sharedui.generated.resources.auth_info_password_reset_sent
 import hikyaku.sharedui.generated.resources.error_load_organisations
 import hikyaku.sharedui.generated.resources.error_load_shifts
 import hikyaku.sharedui.generated.resources.home_delete_blocked_message
+import hikyaku.sharedui.generated.resources.invitation_error_accept_failed
+import hikyaku.sharedui.generated.resources.invitation_error_decline_failed
+import hikyaku.sharedui.generated.resources.invitation_error_email_unverified
+import hikyaku.sharedui.generated.resources.invitation_error_unavailable
 import hikyaku.sharedui.generated.resources.shift_error_delete_failed
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +37,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import org.hikyaku.mobile.auth.model.AuthState
 import org.hikyaku.mobile.auth.model.SignUpOutcome
+import org.hikyaku.mobile.invitation.EmailNotVerifiedException
+import org.hikyaku.mobile.invitation.InvitationRepository
+import org.hikyaku.mobile.invitation.InvitationUnavailableException
+import org.hikyaku.mobile.invitation.model.Invitation
 import org.hikyaku.mobile.organisation.OrganisationRepository
 import org.hikyaku.mobile.organisation.model.Organisation
 import org.hikyaku.mobile.organisation.OrganisationStore
@@ -40,6 +48,7 @@ import org.hikyaku.mobile.shift.ShiftRepository
 import org.hikyaku.mobile.shift.model.Shift
 import org.hikyaku.mobile.shift.session.ShiftSessionStore
 import org.hikyaku.mobile.shift.session.model.ShiftSession
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
 
 data class AuthScreenState(
@@ -58,6 +67,13 @@ data class HomeUiState(
     val selectedOrganisation: Organisation?
         get() = organisations.firstOrNull { it.id == selectedOrgId }
 }
+
+data class InvitationsUiState(
+    val invitations: List<Invitation> = emptyList(),
+    /** The invitation currently being accepted/declined, so only its row shows a spinner. */
+    val actingOnId: String? = null,
+    val errorByInvitationId: Map<String, String> = emptyMap(),
+)
 
 data class ShiftsUiState(
     val isLoading: Boolean = false,
@@ -78,6 +94,7 @@ class AuthViewModel(
     private val repository: AuthRepository = AuthRepository(),
     private val organisationRepository: OrganisationRepository = OrganisationRepository(),
     private val shiftRepository: ShiftRepository = ShiftRepository(),
+    private val invitationRepository: InvitationRepository = InvitationRepository(),
     private val organisationStore: OrganisationStore = OrganisationStore(),
     private val sessionStore: ShiftSessionStore = ShiftSessionStore(),
 ) : ViewModel() {
@@ -118,6 +135,10 @@ class AuthViewModel(
     private val _homeState = MutableStateFlow(HomeUiState())
     val homeState: StateFlow<HomeUiState> = _homeState.asStateFlow()
 
+    /** Team invitations awaiting the signed-in user's decision; drives the accept/decline prompt. */
+    private val _invitationsState = MutableStateFlow(InvitationsUiState())
+    val invitationsState: StateFlow<InvitationsUiState> = _invitationsState.asStateFlow()
+
     private val _shiftState = MutableStateFlow(ShiftsUiState())
     val shiftState: StateFlow<ShiftsUiState> = _shiftState.asStateFlow()
 
@@ -126,6 +147,11 @@ class AuthViewModel(
             authState.collect { state ->
                 _resumeSession.value =
                     if (state is AuthState.Authenticated) sessionStore.load()?.takeIf { it.isActive } else null
+                if (state is AuthState.Authenticated) {
+                    loadPendingInvitations()
+                } else {
+                    _invitationsState.value = InvitationsUiState()
+                }
             }
         }
     }
@@ -133,6 +159,83 @@ class AuthViewModel(
     /** Clears the pending resume target after the app has navigated into the shift. */
     fun consumeResume() {
         _resumeSession.value = null
+    }
+
+    /**
+     * Checks for team invitations addressed to the signed-in user's email. Called on every
+     * sign-in, sign-up, and session restore (see [init]), and again after each accept/decline so
+     * a re-invite that lands mid-session is picked up. Fails silently — an invitation check that
+     * can't reach the server shouldn't lock the user out of the app they were already signed
+     * into.
+     */
+    private fun loadPendingInvitations() {
+        viewModelScope.launch {
+            invitationRepository.fetchPending()
+                .onSuccess { invitations -> _invitationsState.value = InvitationsUiState(invitations = invitations) }
+                .onFailure { _invitationsState.value = InvitationsUiState() }
+        }
+    }
+
+    /**
+     * Accepts [invitationId]. On success, switches the active organisation to the one just
+     * joined (reusing [loadOrganisations]'s "last-saved id" resolution) and drops the invitation
+     * from [invitationsState]. On failure, records a per-invitation error message instead of a
+     * generic toast — notably distinguishing an unverified email (403) from an invitation that's
+     * no longer available (404).
+     */
+    fun acceptInvitation(invitationId: String) {
+        if (_invitationsState.value.actingOnId != null) return
+        _invitationsState.value = _invitationsState.value.copy(
+            actingOnId = invitationId,
+            errorByInvitationId = _invitationsState.value.errorByInvitationId - invitationId,
+        )
+        viewModelScope.launch {
+            invitationRepository.accept(invitationId)
+                .onSuccess { accepted ->
+                    organisationStore.saveSelectedOrgId(accepted.organisationId)
+                    _invitationsState.value = _invitationsState.value.copy(
+                        invitations = _invitationsState.value.invitations.filterNot { it.id == invitationId },
+                        actingOnId = null,
+                    )
+                    loadOrganisations()
+                }
+                .onFailure { setInvitationError(invitationId, it, Res.string.invitation_error_accept_failed) }
+        }
+    }
+
+    /** Declines [invitationId] and drops it from [invitationsState]; no membership is created. */
+    fun declineInvitation(invitationId: String) {
+        if (_invitationsState.value.actingOnId != null) return
+        _invitationsState.value = _invitationsState.value.copy(
+            actingOnId = invitationId,
+            errorByInvitationId = _invitationsState.value.errorByInvitationId - invitationId,
+        )
+        viewModelScope.launch {
+            invitationRepository.decline(invitationId)
+                .onSuccess {
+                    _invitationsState.value = _invitationsState.value.copy(
+                        invitations = _invitationsState.value.invitations.filterNot { it.id == invitationId },
+                        actingOnId = null,
+                    )
+                }
+                .onFailure { setInvitationError(invitationId, it, Res.string.invitation_error_decline_failed) }
+        }
+    }
+
+    private suspend fun setInvitationError(
+        invitationId: String,
+        error: Throwable,
+        fallback: StringResource,
+    ) {
+        val message = when (error) {
+            is EmailNotVerifiedException -> getString(Res.string.invitation_error_email_unverified)
+            is InvitationUnavailableException -> getString(Res.string.invitation_error_unavailable)
+            else -> error.message ?: getString(fallback)
+        }
+        _invitationsState.value = _invitationsState.value.copy(
+            actingOnId = null,
+            errorByInvitationId = _invitationsState.value.errorByInvitationId + (invitationId to message),
+        )
     }
 
     /**

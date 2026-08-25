@@ -41,4 +41,20 @@ object ApiEndpoints {
      * warehouse-wide optimisation run (or null if it has never run one).
      */
     fun optimisationRunLatest(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/optimisation/run/latest"
+
+    /**
+     * `GET {apiUrl}/api/v1/invitations/pending` — team invitations awaiting the caller's
+     * decision, matched by their own verified email (not org-scoped, no `X-Organisation-Slug`
+     * needed).
+     */
+    fun invitationsPending(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/invitations/pending"
+
+    /**
+     * `POST {apiUrl}/api/v1/invitations/{id}/accept` — accepts a pending invitation, creating
+     * the caller's `team_members` row in the invitation's organisation.
+     */
+    fun invitationAccept(apiUrl: String, id: String) = "${apiUrl.trimEnd('/')}/api/v1/invitations/$id/accept"
+
+    /** `POST {apiUrl}/api/v1/invitations/{id}/decline` — declines a pending invitation. */
+    fun invitationDecline(apiUrl: String, id: String) = "${apiUrl.trimEnd('/')}/api/v1/invitations/$id/decline"
 }

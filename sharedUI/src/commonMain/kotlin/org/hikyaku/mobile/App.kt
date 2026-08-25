@@ -31,6 +31,7 @@ import org.hikyaku.mobile.auth.SupabaseClientProvider
 import org.hikyaku.mobile.auth.model.AuthState
 import org.hikyaku.mobile.environment.EnvironmentScreen
 import org.hikyaku.mobile.environment.EnvironmentViewModel
+import org.hikyaku.mobile.invitation.PendingInvitationsDialog
 import org.hikyaku.mobile.toast.LocalToastHostState
 
 @Composable
@@ -112,6 +113,15 @@ private fun AuthenticatedApp(
             } else {
                 LaunchedEffect(state.userId) { viewModel.loadOrganisations() }
                 MainNavGraph(user = state, viewModel = viewModel)
+
+                val invitationsState by viewModel.invitationsState.collectAsState()
+                if (invitationsState.invitations.isNotEmpty()) {
+                    PendingInvitationsDialog(
+                        state = invitationsState,
+                        onAccept = viewModel::acceptInvitation,
+                        onDecline = viewModel::declineInvitation,
+                    )
+                }
             }
         }
         AuthState.Unauthenticated -> AuthNavGraph(

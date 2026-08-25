@@ -360,4 +360,14 @@
     <string name="maintenance_error_missing_description">Enter a description.</string>
     <string name="maintenance_error_choose_date">Choose the date serviced.</string>
     <string name="maintenance_error_submit_failed">Couldn't save the maintenance record.</string>
+
+    <!-- Team invitations -->
+    <string name="invitation_dialog_title">Team invitations</string>
+    <string name="invitation_role_label">Invited as %1$s</string>
+    <string name="invitation_accept">Accept</string>
+    <string name="invitation_decline">Decline</string>
+    <string name="invitation_error_email_unverified">Verify your email address to accept this invitation.</string>
+    <string name="invitation_error_unavailable">This invitation is no longer available.</string>
+    <string name="invitation_error_accept_failed">Couldn't accept this invitation.</string>
+    <string name="invitation_error_decline_failed">Couldn't decline this invitation.</string>
 </resources>
