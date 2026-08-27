@@ -47,9 +47,17 @@ import org.hikyaku.mobile.shift.tracking.ShiftTracker
 import org.hikyaku.mobile.tracking.buildTrackingUrl
 import org.hikyaku.mobile.tracking.parseScannedTrackingNumber
 import org.jetbrains.compose.resources.getString
+import org.maplibre.spatialk.geojson.Point
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+
+/**
+ * Margin applied to both ends of the [ShiftDetailViewModel.shiftStartedAt]..[ShiftDetailViewModel.shiftEndedAt]
+ * window when querying `driver_location_history`, so a client/server clock skew of a few seconds
+ * can't clip the first or last breadcrumb of the shift just driven.
+ */
+private val ROUTE_HISTORY_PADDING = 10.seconds
 
 /**
  * Drives the shift-details screen: loads the shift's routes, and for the selected route its
@@ -74,6 +82,7 @@ class ShiftDetailViewModel(
     private val routePoiRepository: RoutePoiRepository = RoutePoiRepository(),
     private val actionsRepository: ShiftActionsRepository = ShiftActionsRepository(),
     private val editRepository: ShiftEditRepository = ShiftEditRepository(),
+    private val routeHistoryRepository: ShiftRouteHistoryRepository = ShiftRouteHistoryRepository(),
     private val statusCatalog: PackageStatusCatalog = PackageStatusCatalog(),
     private val locationProvider: LocationProvider = LocationProvider(),
     private val sessionStore: ShiftSessionStore = ShiftSessionStore(),
@@ -129,6 +138,12 @@ class ShiftDetailViewModel(
         val atWarehouse: Boolean = false,
         /** True once deliveries are done and the driver is back at the depot. */
         val shiftComplete: Boolean = false,
+        /** True while the "route you travelled" map is open. */
+        val showTravelledRoute: Boolean = false,
+        val isLoadingTravelledRoute: Boolean = false,
+        /** The completed shift's breadcrumb trail, oldest point first. */
+        val travelledRoute: List<Point> = emptyList(),
+        val travelledRouteError: String? = null,
         val isActionInProgress: Boolean = false,
         val actionError: String? = null,
         /** True when the auto-start safety net may be armed for this route (scheduled & within window). */
@@ -246,6 +261,14 @@ class ShiftDetailViewModel(
     /** Dispatcher-set scheduled start (ISO-8601) for this shift, fetched once; gates auto-start. */
     private var scheduledStart: String? = null
 
+    /**
+     * Wall-clock start/end of the *running* shift (not [scheduledStart]), captured so a completed
+     * shift can look up its own slice of `driver_location_history`. Set on [startShift] (or
+     * restored from the persisted session on resume) and on completion; see [buildSession].
+     */
+    private var shiftStartedAt: Instant? = null
+    private var shiftEndedAt: Instant? = null
+
     // Duplicate-frame guard for the QR scanner: `QrScanner.onCompletion` fires on every decoded
     // frame while a label is held in view, so one physical scan would otherwise fire a burst of
     // inserts without this. Deliberately plain fields, not UiState — this is scan-pipeline
@@ -306,6 +329,8 @@ class ShiftDetailViewModel(
     private fun loadRoute(routeId: String, resume: ShiftSession? = null) {
         locationJob?.cancel()
         locationJob = null
+        shiftStartedAt = null
+        shiftEndedAt = null
         _state.value = _state.value.copy(
             isLoadingRoute = true,
             routeError = null,
@@ -322,6 +347,10 @@ class ShiftDetailViewModel(
             deliveriesComplete = false,
             atWarehouse = false,
             shiftComplete = false,
+            showTravelledRoute = false,
+            isLoadingTravelledRoute = false,
+            travelledRoute = emptyList(),
+            travelledRouteError = null,
             isActionInProgress = false,
             actionError = null,
             autoStartEligible = false,
@@ -375,6 +404,7 @@ class ShiftDetailViewModel(
 
     /** Re-applies a persisted session over freshly-fetched (authoritative) steps and resumes tracking. */
     private fun applyResume(session: ShiftSession, steps: List<RouteStep>) {
+        shiftStartedAt = session.startedAt?.let { runCatching { Instant.parse(it) }.getOrNull() }
         _state.value = _state.value.copy(
             shiftStarted = true,
             inTransitPackageId = session.inTransitPackageId,
@@ -706,6 +736,7 @@ class ShiftDetailViewModel(
             }
             started
                 .onSuccess {
+                    shiftStartedAt = Clock.System.now()
                     val overrides = firstPackageId
                         ?.let { _state.value.statusOverrides + (it to ShiftStatus.IN_TRANSIT) }
                         ?: _state.value.statusOverrides
@@ -918,6 +949,8 @@ class ShiftDetailViewModel(
             deliveriesComplete = deliveriesComplete,
             depotLat = depot?.first,
             depotLng = depot?.second,
+            startedAt = shiftStartedAt?.toString(),
+            endedAt = shiftEndedAt?.toString(),
         )
     }
 
@@ -1003,6 +1036,7 @@ class ShiftDetailViewModel(
     private fun recomputeCompletion() {
         val s = _state.value
         if (s.deliveriesComplete && s.atWarehouse && !s.shiftComplete) {
+            shiftEndedAt = Clock.System.now()
             _state.value = s.copy(shiftComplete = true)
             locationJob?.cancel()
             locationJob = null
@@ -1018,6 +1052,50 @@ class ShiftDetailViewModel(
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Post-shift breadcrumb trail: once complete, the driver can see the route they actually
+    // drove, read from `driver_location_history` for [shiftStartedAt]..[shiftEndedAt].
+    // -----------------------------------------------------------------------
+
+    /** Opens the route-travelled map, fetching it the first time (or after a failed attempt). */
+    fun openTravelledRoute() {
+        _state.value = _state.value.copy(showTravelledRoute = true)
+        if (_state.value.travelledRoute.isEmpty() && !_state.value.isLoadingTravelledRoute) loadTravelledRoute()
+    }
+
+    fun closeTravelledRoute() {
+        _state.value = _state.value.copy(showTravelledRoute = false)
+    }
+
+    fun retryTravelledRoute() = loadTravelledRoute()
+
+    private fun loadTravelledRoute() {
+        val startedAt = shiftStartedAt
+        if (startedAt == null) {
+            // Shouldn't happen (shiftComplete only follows a real startShift/resume), but without a
+            // start time there's no way to bound the query, so fail rather than guess a range.
+            _state.value = _state.value.copy(travelledRouteError = "No start time recorded for this shift.")
+            return
+        }
+        val endedAt = shiftEndedAt ?: Clock.System.now()
+        _state.value = _state.value.copy(isLoadingTravelledRoute = true, travelledRouteError = null)
+        viewModelScope.launch {
+            routeHistoryRepository.fetchTravelledRoute(
+                fromIso = (startedAt - ROUTE_HISTORY_PADDING).toString(),
+                toIso = (endedAt + ROUTE_HISTORY_PADDING).toString(),
+            )
+                .onSuccess { points ->
+                    _state.value = _state.value.copy(isLoadingTravelledRoute = false, travelledRoute = points)
+                }
+                .onFailure { error ->
+                    _state.value = _state.value.copy(
+                        isLoadingTravelledRoute = false,
+                        travelledRouteError = error.message ?: "Couldn't load your route.",
+                    )
+                }
+        }
+    }
+
     /**
      * Reflects completion that may have happened in the background service: when the persisted
      * session for this shift reaches [ShiftPhase.COMPLETE], show the completed state and clear it.
@@ -1030,6 +1108,8 @@ class ShiftDetailViewModel(
                     session.phase == ShiftPhase.COMPLETE &&
                     !_state.value.shiftComplete
                 ) {
+                    shiftStartedAt = session.startedAt?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: shiftStartedAt
+                    shiftEndedAt = session.endedAt?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: Clock.System.now()
                     _state.value = _state.value.copy(
                         deliveriesComplete = true,
                         atWarehouse = true,

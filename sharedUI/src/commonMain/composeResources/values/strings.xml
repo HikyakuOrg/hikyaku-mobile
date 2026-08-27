@@ -130,6 +130,8 @@
     <string name="shift_no_routes">This shift has no routes.</string>
     <string name="shift_complete_banner">Shift complete — you're back at the warehouse.</string>
     <string name="shift_all_delivered_banner">All stops delivered. Return to the warehouse to finish the shift.</string>
+    <string name="shift_view_travelled_route">View your route</string>
+    <string name="shift_travelled_route_empty">No location data was recorded for this shift.</string>
     <string name="shift_permission_required_message">Background location ("Allow all the time") and notifications are required to keep tracking your shift in the background. Enable them in settings, then start the shift.</string>
     <string name="shift_start_button">Start shift</string>
     <string name="shift_start_permission_title">Allow location &amp; notifications</string>

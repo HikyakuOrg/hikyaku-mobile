@@ -21,6 +21,7 @@ import org.hikyaku.mobile.shift.location.LocationProvider
 import org.hikyaku.mobile.shift.session.ShiftSessionStore
 import org.hikyaku.mobile.shift.session.WAREHOUSE_RADIUS_METERS
 import org.hikyaku.mobile.shift.session.model.ShiftPhase
+import kotlin.time.Clock
 
 /**
  * Foreground service that keeps a shift tracked while the app is backgrounded: it streams the
@@ -83,7 +84,7 @@ class ShiftTrackingService : Service() {
                 val meters = haversineMeters(loc.lat, loc.lng, depotLat, depotLng)
                 if (meters <= WAREHOUSE_RADIUS_METERS) {
                     // Publishes COMPLETE to any open screen; then the service is done.
-                    sessionStore.save(session.copy(phase = ShiftPhase.COMPLETE))
+                    sessionStore.save(session.copy(phase = ShiftPhase.COMPLETE, endedAt = Clock.System.now().toString()))
                     stopForegroundCompat()
                     stopSelf()
                 }

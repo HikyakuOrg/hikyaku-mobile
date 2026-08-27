@@ -13,6 +13,7 @@ import org.hikyaku.mobile.shift.session.isWithinAutoStartWindow
 import org.hikyaku.mobile.shift.session.model.ShiftPhase
 import org.hikyaku.mobile.shift.session.model.ShiftSession
 import org.hikyaku.mobile.shift.tracking.ShiftTracker
+import kotlin.time.Clock
 
 /**
  * The shared brain of the auto-start safety net, called by the Android receiver each time a
@@ -94,6 +95,7 @@ class AutoStartCoordinator(
             deliveriesComplete = false,
             depotLat = updated.depotLat,
             depotLng = updated.depotLng,
+            startedAt = Clock.System.now().toString(),
         )
         org.hikyaku.mobile.shift.session.ShiftSessionStore().save(session)
         ShiftTracker().start(session)
