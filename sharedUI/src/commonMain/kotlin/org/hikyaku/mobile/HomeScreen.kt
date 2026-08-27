@@ -3,7 +3,6 @@ package org.hikyaku.mobile
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -66,13 +65,16 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import com.kizitonwose.calendar.compose.HorizontalCalendar
-import com.kizitonwose.calendar.compose.rememberCalendarState
-import com.kizitonwose.calendar.core.CalendarDay
-import com.kizitonwose.calendar.core.DayPosition
+import com.kizitonwose.calendar.compose.WeekCalendar
+import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
+import com.kizitonwose.calendar.core.Week
+import com.kizitonwose.calendar.core.WeekDay
+import com.kizitonwose.calendar.core.WeekDayPosition
 import com.kizitonwose.calendar.core.daysOfWeek
+import com.kizitonwose.calendar.core.minusDays
 import com.kizitonwose.calendar.core.minusMonths
 import com.kizitonwose.calendar.core.now
+import com.kizitonwose.calendar.core.plusDays
 import com.kizitonwose.calendar.core.plusMonths
 import hikyaku.sharedui.generated.resources.Res
 import hikyaku.sharedui.generated.resources.action_delete
@@ -80,9 +82,9 @@ import hikyaku.sharedui.generated.resources.action_ok
 import hikyaku.sharedui.generated.resources.action_retry
 import hikyaku.sharedui.generated.resources.action_undo
 import hikyaku.sharedui.generated.resources.app_name
-import hikyaku.sharedui.generated.resources.cd_next_month
+import hikyaku.sharedui.generated.resources.cd_next_week
 import hikyaku.sharedui.generated.resources.cd_open_navigation_menu
-import hikyaku.sharedui.generated.resources.cd_previous_month
+import hikyaku.sharedui.generated.resources.cd_previous_week
 import hikyaku.sharedui.generated.resources.home_delete_blocked_message
 import hikyaku.sharedui.generated.resources.home_delete_blocked_title
 import hikyaku.sharedui.generated.resources.home_no_shifts
@@ -94,7 +96,7 @@ import hikyaku.sharedui.generated.resources.shift_deleted_snackbar
 import kotlinx.coroutines.launch
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.YearMonth
-import org.hikyaku.mobile.util.formatDisplayDate
+import kotlinx.datetime.yearMonth
 import org.hikyaku.mobile.auth.HomeUiState
 import org.hikyaku.mobile.auth.ShiftsUiState
 import org.hikyaku.mobile.auth.model.AuthState
@@ -134,10 +136,10 @@ fun HomeScreen(
     // rememberSwipeToDismissBoxState saves its value by slot, and without this a restored card
     // would reappear still showing the swiped-away "Dismissed" state instead of resetting.
     var swipeGeneration by remember { mutableStateOf(emptyMap<String, Int>()) }
-    // The date (or date range) picked on the calendar; shifts below are filtered to this. Since
+    // The date picked on the calendar; shifts below are filtered to this. Since
     // [shiftState.shifts] is already scoped to the selected organisation (see AuthViewModel.loadShifts),
-    // filtering it client-side by date keeps every date/range view scoped by org for free.
-    var dateSelection by remember { mutableStateOf(DateSelection(startDate = LocalDate.now())) }
+    // filtering it client-side by date keeps every date view scoped by org for free.
+    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     val canDeleteShifts = homeState.selectedOrganisation?.isPersonal == true
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -218,10 +220,9 @@ fun HomeScreen(
             ) {
                 item {
                     ShiftCalendar(
-                        selection = dateSelection,
+                        selectedDate = selectedDate,
                         shiftDates = shiftDates,
-                        onDayClick = { date -> dateSelection = DateSelection(startDate = date) },
-                        onDayLongPress = { date -> dateSelection = dateSelection.extendedBy(date) },
+                        onDayClick = { date -> selectedDate = date },
                     )
                 }
 
@@ -245,7 +246,7 @@ fun HomeScreen(
 
                     else -> shiftListItems(
                         visibleShifts = visibleShifts,
-                        selection = dateSelection,
+                        selectedDate = selectedDate,
                         completedShiftIds = shiftState.completedShiftIds,
                         packageCounts = shiftState.packageCounts,
                         canDeleteShifts = canDeleteShifts,
@@ -412,33 +413,12 @@ private fun HomeScreenEmptyPreview() {
     }
 }
 
-/** Which single date, or inclusive date range, is picked on [ShiftCalendar]. */
-private data class DateSelection(val startDate: LocalDate? = null, val endDate: LocalDate? = null)
-
 /**
- * Applies a calendar long-press to the current selection, building a multi-day range: the
- * first long-press starts a new range anchor; a second long-press on a different date extends
- * it into a range (earlier dates extend the start, later dates extend the end); a third
- * long-press starts a fresh range anchored at the newly pressed date.
- */
-private fun DateSelection.extendedBy(pressed: LocalDate): DateSelection {
-    val start = startDate
-    return when {
-        start == null -> DateSelection(startDate = pressed)
-        endDate != null -> DateSelection(startDate = pressed)
-        pressed < start -> DateSelection(startDate = pressed, endDate = start)
-        pressed != start -> DateSelection(startDate = start, endDate = pressed)
-        else -> DateSelection(startDate = pressed)
-    }
-}
-
-/**
- * Renders [visibleShifts] filtered to [selection]: a flat list for a single date, or a list
- * grouped under a date header per day for a range.
+ * Renders [visibleShifts] filtered to [selectedDate] as a flat list.
  */
 private fun LazyListScope.shiftListItems(
     visibleShifts: List<Shift>,
-    selection: DateSelection,
+    selectedDate: LocalDate,
     completedShiftIds: Set<String>,
     packageCounts: Map<String, Int>,
     canDeleteShifts: Boolean,
@@ -448,20 +428,9 @@ private fun LazyListScope.shiftListItems(
     onSwipeToDelete: (Shift) -> Unit,
     onDeleteBlocked: () -> Unit,
 ) {
-    val start = selection.startDate
-    val end = selection.endDate
-    val groups = when {
-        start == null -> emptyMap()
-        end == null -> visibleShifts.filter { it.calendarDate == start }
-            .sortedBy { it.createdAt }
-            .let { if (it.isEmpty()) emptyMap() else mapOf(start to it) }
-        else -> visibleShifts.filter { it.calendarDate in start..end }
-            .groupBy { it.calendarDate }
-            .toSortedMap()
-            .mapValues { (_, shifts) -> shifts.sortedBy { it.createdAt } }
-    }
+    val dateShifts = visibleShifts.filter { it.calendarDate == selectedDate }.sortedBy { it.createdAt }
 
-    if (groups.isEmpty()) {
+    if (dateShifts.isEmpty()) {
         item {
             Text(
                 text = stringResource(Res.string.home_no_shifts_for_date),
@@ -472,65 +441,58 @@ private fun LazyListScope.shiftListItems(
         return
     }
 
-    val showHeaders = end != null
-    groups.forEach { (date, dateShifts) ->
-        if (showHeaders) {
-            item(key = "header-$date") { DateHeader(date) }
-        }
-        for (shift in dateShifts) {
-            item(key = shift.id) {
-                key(shift.id, swipeGeneration[shift.id] ?: 0) {
-                    DeletableShiftCard(
-                        shift = shift,
-                        isCompleted = shift.id in completedShiftIds,
-                        packageCount = packageCounts[shift.id] ?: 0,
-                        canDelete = canDeleteShifts,
-                        isDeleteBlocked = shift.id in nonDeletableShiftIds,
-                        onClick = { onShiftClick(shift.id) },
-                        onSwipeToDelete = { onSwipeToDelete(shift) },
-                        onDeleteBlocked = onDeleteBlocked,
-                    )
-                }
+    for (shift in dateShifts) {
+        item(key = shift.id) {
+            key(shift.id, swipeGeneration[shift.id] ?: 0) {
+                DeletableShiftCard(
+                    shift = shift,
+                    isCompleted = shift.id in completedShiftIds,
+                    packageCount = packageCounts[shift.id] ?: 0,
+                    canDelete = canDeleteShifts,
+                    isDeleteBlocked = shift.id in nonDeletableShiftIds,
+                    onClick = { onShiftClick(shift.id) },
+                    onSwipeToDelete = { onSwipeToDelete(shift) },
+                    onDeleteBlocked = onDeleteBlocked,
+                )
             }
         }
     }
 }
 
 /**
- * A month-at-a-time calendar with a prev/next header. A tap drives [selection] via [onDayClick]
- * (always a single date); a long-press drives it via [onDayLongPress] (builds a multi-day range).
+ * A week-at-a-time calendar with a prev/next header. A tap selects a single date via [onDayClick];
+ * unlike a month calendar there is no long-press and no multi-select.
  */
 @Composable
 private fun ShiftCalendar(
-    selection: DateSelection,
+    selectedDate: LocalDate,
     shiftDates: Set<LocalDate>,
     onDayClick: (LocalDate) -> Unit,
-    onDayLongPress: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val currentMonth = remember { YearMonth.now() }
-    val startMonth = remember { currentMonth.minusMonths(24) }
-    val endMonth = remember { currentMonth.plusMonths(24) }
+    val today = remember { LocalDate.now() }
+    val startDate = remember { today.minusMonths(24) }
+    val endDate = remember { today.plusMonths(24) }
     val weekDays = remember { daysOfWeek() }
-    val state = rememberCalendarState(
-        startMonth = startMonth,
-        endMonth = endMonth,
-        firstVisibleMonth = currentMonth,
+    val state = rememberWeekCalendarState(
+        startDate = startDate,
+        endDate = endDate,
+        firstVisibleWeekDate = today,
         firstDayOfWeek = weekDays.first(),
     )
     val coroutineScope = rememberCoroutineScope()
 
     Column(modifier.fillMaxWidth()) {
-        CalendarMonthHeader(
-            yearMonth = state.firstVisibleMonth.yearMonth,
+        CalendarWeekHeader(
+            week = state.firstVisibleWeek,
             onPrevious = {
                 coroutineScope.launch {
-                    state.animateScrollToMonth(state.firstVisibleMonth.yearMonth.minusMonths(1))
+                    state.animateScrollToWeek(state.firstVisibleWeek.days.first().date.minusDays(7))
                 }
             },
             onNext = {
                 coroutineScope.launch {
-                    state.animateScrollToMonth(state.firstVisibleMonth.yearMonth.plusMonths(1))
+                    state.animateScrollToWeek(state.firstVisibleWeek.days.first().date.plusDays(7))
                 }
             },
         )
@@ -545,15 +507,14 @@ private fun ShiftCalendar(
                 )
             }
         }
-        HorizontalCalendar(
+        WeekCalendar(
             state = state,
             dayContent = { day ->
                 CalendarDayCell(
                     day = day,
-                    selection = selection,
+                    selectedDate = selectedDate,
                     hasShifts = day.date in shiftDates,
                     onClick = onDayClick,
-                    onLongPress = onDayLongPress,
                 )
             },
         )
@@ -561,8 +522,8 @@ private fun ShiftCalendar(
 }
 
 @Composable
-private fun CalendarMonthHeader(
-    yearMonth: YearMonth,
+private fun CalendarWeekHeader(
+    week: Week,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
 ) {
@@ -571,16 +532,16 @@ private fun CalendarMonthHeader(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         IconButton(onClick = onPrevious) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(Res.string.cd_previous_month))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(Res.string.cd_previous_week))
         }
         Text(
-            text = monthDisplayText(yearMonth),
+            text = monthDisplayText(week.days.first().date.yearMonth),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
             modifier = Modifier.weight(1f),
         )
         IconButton(onClick = onNext) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(Res.string.cd_next_month))
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(Res.string.cd_next_week))
         }
     }
 }
@@ -592,54 +553,30 @@ private fun monthDisplayText(yearMonth: YearMonth): String {
 
 @Composable
 private fun CalendarDayCell(
-    day: CalendarDay,
-    selection: DateSelection,
+    day: WeekDay,
+    selectedDate: LocalDate,
     hasShifts: Boolean,
     onClick: (LocalDate) -> Unit,
-    onLongPress: (LocalDate) -> Unit,
 ) {
-    if (day.position != DayPosition.MonthDate) {
+    if (day.position != WeekDayPosition.RangeDate) {
         Box(Modifier.aspectRatio(1f))
         return
     }
-    val isStart = day.date == selection.startDate
-    val isEnd = day.date == selection.endDate
-    val isSingle = isStart && selection.endDate == null
-    val start = selection.startDate
-    val end = selection.endDate
-    val isBetween = start != null && end != null && day.date > start && day.date < end
+    val isSelected = day.date == selectedDate
 
-    val highlight = when {
-        isSingle -> Modifier
+    val highlight = if (isSelected) {
+        Modifier
             .padding(vertical = 4.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.primary)
-
-        isStart -> Modifier
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(topStartPercent = 50, bottomStartPercent = 50))
-            .background(MaterialTheme.colorScheme.primary)
-
-        isEnd -> Modifier
-            .padding(vertical = 4.dp)
-            .clip(RoundedCornerShape(topEndPercent = 50, bottomEndPercent = 50))
-            .background(MaterialTheme.colorScheme.primary)
-
-        isBetween -> Modifier
-            .padding(vertical = 4.dp)
-            .background(MaterialTheme.colorScheme.primaryContainer)
-
-        else -> Modifier
+    } else {
+        Modifier
     }
-    val isEdge = isStart || isEnd
 
     Box(
         modifier = Modifier
             .aspectRatio(1f)
-            .combinedClickable(
-                onClick = { onClick(day.date) },
-                onLongClick = { onLongPress(day.date) },
-            )
+            .clickable { onClick(day.date) }
             .then(highlight),
         contentAlignment = Alignment.Center,
     ) {
@@ -647,7 +584,7 @@ private fun CalendarDayCell(
             Text(
                 text = day.date.day.toString(),
                 style = MaterialTheme.typography.bodyMedium,
-                color = if (isEdge) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
             )
             if (hasShifts) {
                 Box(
@@ -655,23 +592,13 @@ private fun CalendarDayCell(
                         .padding(top = 2.dp)
                         .size(4.dp)
                         .background(
-                            color = if (isEdge) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
+                            color = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.primary,
                             shape = CircleShape,
                         ),
                 )
             }
         }
     }
-}
-
-@Composable
-private fun DateHeader(date: LocalDate) {
-    Text(
-        text = formatDisplayDate(date),
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp),
-    )
 }
 
 @Composable

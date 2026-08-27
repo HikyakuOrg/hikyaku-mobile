@@ -23,8 +23,8 @@
     <string name="cd_country_selector">Country selector</string>
     <string name="cd_package_photo">Package photo</string>
     <string name="cd_open_navigation_menu">Open navigation menu</string>
-    <string name="cd_previous_month">Previous month</string>
-    <string name="cd_next_month">Next month</string>
+    <string name="cd_previous_week">Previous week</string>
+    <string name="cd_next_week">Next week</string>
 
     <!-- Navigation drawer -->
     <string name="nav_home">Home</string>
