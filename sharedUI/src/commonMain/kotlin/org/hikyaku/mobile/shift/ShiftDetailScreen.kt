@@ -59,6 +59,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -93,6 +95,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import io.github.jan.supabase.storage.StorageItem
@@ -106,6 +109,7 @@ import org.hikyaku.mobile.map.mapLayersSupported
 import org.hikyaku.mobile.share.rememberShareText
 import org.hikyaku.mobile.shift.scan.ScanPackagesOverlay
 import org.hikyaku.mobile.theme.HikyakuTheme
+import org.hikyaku.mobile.toast.LocalToastHostState
 import org.hikyaku.mobile.toast.ToastEffect
 import org.hikyaku.mobile.util.combineDateAndTimeToIsoUtc
 import org.hikyaku.mobile.util.epochMillisToDisplayDate
@@ -167,6 +171,9 @@ import hikyaku.sharedui.generated.resources.shift_trip_duration
 import hikyaku.sharedui.generated.resources.shift_trip_start
 import hikyaku.sharedui.generated.resources.shift_trip_vehicle
 import hikyaku.sharedui.generated.resources.shift_unknown_recipient
+import hikyaku.sharedui.generated.resources.shift_updated_action_reload
+import hikyaku.sharedui.generated.resources.shift_updated_packages_added
+import hikyaku.sharedui.generated.resources.shift_updated_replanned
 import hikyaku.sharedui.generated.resources.shift_view_travelled_route
 import hikyaku.sharedui.generated.resources.shift_travelled_route_empty
 import org.hikyaku.mobile.shift.detail.model.Customer
@@ -257,6 +264,18 @@ fun ShiftDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+
+    // The 30-second shift-version poll runs only while this screen is actually on top: a
+    // backgrounded app has nobody to tell, and the driver is the only reason to spend the request.
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onResumed()
+        onPauseOrDispose { viewModel.onPaused() }
+    }
+    ShiftUpdateSnackbar(
+        notice = state.shiftUpdate,
+        onReload = viewModel::reloadAfterShiftUpdate,
+        onDismiss = viewModel::dismissShiftUpdate,
+    )
 
     ShiftDetailScreenContent(
         state = state,
@@ -1935,5 +1954,38 @@ private fun RetryCard(
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = onRetry) { Text(retryLabel) }
         }
+    }
+}
+
+/**
+ * Tells the driver their shift changed under them and offers a reload — it never reloads on its
+ * own. Instant assignment can add a stop to a shift the driver already has open, and silently
+ * re-routing someone who is following a route is a safety problem, not a UX nicety. Dismissing the
+ * snackbar keeps the plan they are looking at.
+ */
+@Composable
+private fun ShiftUpdateSnackbar(
+    notice: ShiftUpdateNotice?,
+    onReload: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val hostState = LocalToastHostState.current
+    val message = notice?.let {
+        if (it.addedStops > 0) {
+            stringResource(Res.string.shift_updated_packages_added, it.addedStops.toString())
+        } else {
+            stringResource(Res.string.shift_updated_replanned)
+        }
+    }
+    val reloadLabel = stringResource(Res.string.shift_updated_action_reload)
+    // Keyed on the revision so a second change re-shows the snackbar rather than being swallowed.
+    LaunchedEffect(notice?.revision) {
+        if (message == null) return@LaunchedEffect
+        val result = hostState.showSnackbar(
+            message = message,
+            actionLabel = reloadLabel,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) onReload() else onDismiss()
     }
 }

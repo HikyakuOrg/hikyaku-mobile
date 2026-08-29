@@ -13,6 +13,7 @@ import io.github.jan.supabase.storage.StorageItem
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -83,6 +84,7 @@ class ShiftDetailViewModel(
     private val actionsRepository: ShiftActionsRepository = ShiftActionsRepository(),
     private val editRepository: ShiftEditRepository = ShiftEditRepository(),
     private val routeHistoryRepository: ShiftRouteHistoryRepository = ShiftRouteHistoryRepository(),
+    private val versionRepository: ShiftVersionRepository = ShiftVersionRepository(),
     private val statusCatalog: PackageStatusCatalog = PackageStatusCatalog(),
     private val locationProvider: LocationProvider = LocationProvider(),
     private val sessionStore: ShiftSessionStore = ShiftSessionStore(),
@@ -169,6 +171,13 @@ class ShiftDetailViewModel(
         val editError: String? = null,
         /** The add-stop form, non-null while the add-stop sheet is open. */
         val addStop: AddStopDraft? = null,
+        // --- live-shift visibility ---
+        /**
+         * Set when the 30-second version poll notices the plan changed under the driver. Rendered as
+         * a snackbar offering a reload — never acted on automatically, since silently re-routing a
+         * driver mid-shift is a safety problem.
+         */
+        val shiftUpdate: ShiftUpdateNotice? = null,
     ) {
         val jobStops: List<RouteStep> get() = steps.filter { it.isJob }
 
@@ -258,6 +267,12 @@ class ShiftDetailViewModel(
     /** Streams the driver's location in-process (iOS/desktop only); cancelled on completion/clear. */
     private var locationJob: Job? = null
 
+    /** Decides when to poll the shift version and whether an answer is worth reporting. */
+    private val versionPoll = ShiftVersionPoll()
+
+    /** The version-poll loop; runs only between [onResumed] and [onPaused]. */
+    private var versionPollJob: Job? = null
+
     /** Dispatcher-set scheduled start (ISO-8601) for this shift, fetched once; gates auto-start. */
     private var scheduledStart: String? = null
 
@@ -331,6 +346,9 @@ class ShiftDetailViewModel(
         locationJob = null
         shiftStartedAt = null
         shiftEndedAt = null
+        // Whatever the server reports next is what the driver is now looking at, so it must not be
+        // announced as a change.
+        versionPoll.reset()
         _state.value = _state.value.copy(
             isLoadingRoute = true,
             routeError = null,
@@ -359,6 +377,7 @@ class ShiftDetailViewModel(
             durationSeconds = _state.value.routes.firstOrNull { it.id == routeId }?.duration?.toDouble(),
             vehicleLabel = null,
             recipients = emptyMap(),
+            shiftUpdate = null,
         )
         viewModelScope.launch {
             repository.fetchRouteSteps(routeId)
@@ -613,6 +632,62 @@ class ShiftDetailViewModel(
                     }
                 }
         }
+    }
+
+    // -----------------------------------------------------------------------
+    // Live-shift visibility: the app has no realtime and no push, so a package the backend assigns
+    // to this shift after it was opened is invisible until a refresh. A 30-second poll of the cheap
+    // GET /shifts/{id}/version endpoint closes that gap while the screen is on top.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Starts the version poll. Driven by the screen's `ON_RESUME`, so it costs nothing while the app
+     * is backgrounded or the driver is on another screen. Polls once immediately — returning to the
+     * screen is exactly when a stale plan matters most — then every [VERSION_POLL_INTERVAL].
+     */
+    fun onResumed() {
+        val pollNow = versionPoll.resume()
+        versionPollJob?.cancel()
+        versionPollJob = viewModelScope.launch {
+            if (pollNow) pollShiftVersion()
+            while (true) {
+                delay(VERSION_POLL_INTERVAL)
+                pollShiftVersion()
+            }
+        }
+    }
+
+    /** Stops the version poll. Driven by the screen's `ON_PAUSE`; also called from [onCleared]. */
+    fun onPaused() {
+        versionPoll.pause()
+        versionPollJob?.cancel()
+        versionPollJob = null
+    }
+
+    /**
+     * One version check. A failure is deliberately silent: this is a background nicety, and a
+     * banner about a failed poll would be noise a driver can do nothing with. The route the driver
+     * is looking at stays exactly as it is either way.
+     */
+    private suspend fun pollShiftVersion() {
+        if (!versionPoll.shouldPoll(_state.value.shiftStarted)) return
+        val version = versionRepository.fetchVersion(orgSlug, shiftId).getOrNull() ?: return
+        val notice = versionPoll.observe(version) ?: return
+        _state.value = _state.value.copy(shiftUpdate = notice)
+    }
+
+    /** Dismisses the update snackbar without reloading — the driver chose to keep their plan. */
+    fun dismissShiftUpdate() {
+        _state.value = _state.value.copy(shiftUpdate = null)
+    }
+
+    /**
+     * Accepts the offered reload. Goes through [loadRoutes] rather than [loadRoute] so a shift that
+     * is mid-run is restored from its persisted session instead of being reset to "not started".
+     */
+    fun reloadAfterShiftUpdate() {
+        _state.value = _state.value.copy(shiftUpdate = null)
+        loadRoutes()
     }
 
     /**
@@ -1132,7 +1207,18 @@ class ShiftDetailViewModel(
         // On Android the foreground service must outlive the ViewModel/Activity (that's the point
         // of resume-on-kill), so only the in-process stream used elsewhere is cancelled here.
         if (!tracker.handlesLocationStreaming) locationJob?.cancel()
+        // The version poll, by contrast, is purely a screen concern and dies with the screen.
+        onPaused()
         super.onCleared()
+    }
+
+    private companion object {
+        /**
+         * How often the shift version is re-checked while the screen is resumed. Thirty seconds is
+         * the plan's deliberate floor: the request is a single indexed row read, and anything slower
+         * leaves a driver looking at a stale route for longer than they'd tolerate.
+         */
+        val VERSION_POLL_INTERVAL = 30.seconds
     }
 }
 
