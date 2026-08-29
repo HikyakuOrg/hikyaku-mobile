@@ -81,6 +81,20 @@ import hikyaku.sharedui.generated.resources.package_label_height
 import hikyaku.sharedui.generated.resources.package_label_length
 import hikyaku.sharedui.generated.resources.package_label_weight
 import hikyaku.sharedui.generated.resources.package_label_width
+import hikyaku.sharedui.generated.resources.package_outcome_assigned
+import hikyaku.sharedui.generated.resources.package_outcome_assigned_eta
+import hikyaku.sharedui.generated.resources.package_outcome_deferred
+import hikyaku.sharedui.generated.resources.package_outcome_evicted
+import hikyaku.sharedui.generated.resources.package_outcome_new_shift
+import hikyaku.sharedui.generated.resources.package_outcome_new_shift_eta
+import hikyaku.sharedui.generated.resources.package_outcome_reason_allowance
+import hikyaku.sharedui.generated.resources.package_outcome_reason_auto_assign
+import hikyaku.sharedui.generated.resources.package_outcome_reason_deadline
+import hikyaku.sharedui.generated.resources.package_outcome_reason_no_capacity
+import hikyaku.sharedui.generated.resources.package_outcome_reason_no_driver
+import hikyaku.sharedui.generated.resources.package_outcome_reason_no_geocode
+import hikyaku.sharedui.generated.resources.package_outcome_skipped
+import hikyaku.sharedui.generated.resources.package_outcome_title
 import hikyaku.sharedui.generated.resources.package_section_arrival
 import hikyaku.sharedui.generated.resources.package_section_dimensions
 import hikyaku.sharedui.generated.resources.package_section_images
@@ -89,6 +103,7 @@ import hikyaku.sharedui.generated.resources.package_section_sender
 import hikyaku.sharedui.generated.resources.package_section_warehouse
 import hikyaku.sharedui.generated.resources.package_submit
 import hikyaku.sharedui.generated.resources.warehouse_personal_org_limit_notice
+import org.hikyaku.mobile.api.generated.models.AssignmentOutcomeDto
 import org.hikyaku.mobile.geocode.model.AddressSuggestion
 import org.hikyaku.mobile.map.LocationPickerDialog
 import org.hikyaku.mobile.map.LocationPinIcon
@@ -121,6 +136,12 @@ fun AddPackageScreen(
     val state by viewModel.state.collectAsState()
     LaunchedEffect(state.done) { if (state.done) onDone() }
     ToastEffect(state.error)
+
+    // The package is already created by the time this shows; the panel exists so the driver sees
+    // whether it landed on a shift before the form closes.
+    state.assignment?.let { assignment ->
+        AssignmentOutcomeDialog(assignment = assignment, onDismiss = viewModel::dismissAssignment)
+    }
 
     AddPackageScreenContent(
         state = state,
@@ -670,3 +691,65 @@ private fun SectionLabel(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
 }
 
+
+/**
+ * Confirms the created package and, crucially, says what happened to it: `POST /api/v1/packages`
+ * assigns it to a shift on the spot, so the driver can be told "stop 4, arriving about 14:20"
+ * instead of the old "saved, come back tomorrow". A queued or skipped outcome is not an error —
+ * the package exists either way — so this is a confirmation, not a failure dialog.
+ */
+@Composable
+private fun AssignmentOutcomeDialog(assignment: PackageAssignmentDisplay, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(Res.string.package_outcome_title)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(assignmentHeadline(assignment))
+                assignmentReason(assignment)?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                if (assignment.evictedCount > 0) {
+                    Text(
+                        text = stringResource(Res.string.package_outcome_evicted, assignment.evictedCount.toString()),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.action_ok)) } },
+    )
+}
+
+/** The one-line verdict: on a shift (and where), queued, or not attempted. */
+@Composable
+private fun assignmentHeadline(assignment: PackageAssignmentDisplay): String {
+    val stop = assignment.stopNumber?.toString()
+    val eta = assignment.estimatedArrival
+    return when {
+        stop == null && assignment.outcome == AssignmentOutcomeDto.Outcome.skipped ->
+            stringResource(Res.string.package_outcome_skipped)
+        stop == null -> stringResource(Res.string.package_outcome_deferred)
+        assignment.openedNewShift && eta != null ->
+            stringResource(Res.string.package_outcome_new_shift_eta, stop, eta)
+        assignment.openedNewShift -> stringResource(Res.string.package_outcome_new_shift, stop)
+        eta != null -> stringResource(Res.string.package_outcome_assigned_eta, stop, eta)
+        else -> stringResource(Res.string.package_outcome_assigned, stop)
+    }
+}
+
+/** The supporting "why it isn't on a shift" line, or null when it is on one (or no reason was given). */
+@Composable
+private fun assignmentReason(assignment: PackageAssignmentDisplay): String? {
+    if (assignment.isAssigned) return null
+    return when (assignment.reason) {
+        AssignmentOutcomeDto.Reason.no_capacity -> stringResource(Res.string.package_outcome_reason_no_capacity)
+        AssignmentOutcomeDto.Reason.no_free_driver_vehicle -> stringResource(Res.string.package_outcome_reason_no_driver)
+        AssignmentOutcomeDto.Reason.shift_allowance_exhausted -> stringResource(Res.string.package_outcome_reason_allowance)
+        AssignmentOutcomeDto.Reason.no_geocode -> stringResource(Res.string.package_outcome_reason_no_geocode)
+        AssignmentOutcomeDto.Reason.auto_assign_disabled -> stringResource(Res.string.package_outcome_reason_auto_assign)
+        AssignmentOutcomeDto.Reason.deadline_infeasible -> stringResource(Res.string.package_outcome_reason_deadline)
+        null -> null
+    }
+}

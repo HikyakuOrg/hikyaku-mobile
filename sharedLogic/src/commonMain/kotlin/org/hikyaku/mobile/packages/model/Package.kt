@@ -84,11 +84,15 @@ data class PackageTimelineEntry(
 /**
  * Everything needed to persist a new package: its physical dimensions, sender/receiver (persisted
  * to `customer`, reusing a returning customer where possible), the starting [warehouseId], optional
- * [deliveryNotes], the [scheduledArrival] delivery window, and any [images] to upload to the
- * `packages` storage bucket.
+ * [deliveryNotes], the [scheduledArrival] deadline, and any [images] to upload to the `packages`
+ * storage bucket.
+ *
+ * [organisationId] scopes the customer lookups, which still go through PostgREST; [orgSlug] scopes
+ * the `POST /api/v1/packages` call, which takes the org from `X-Organisation-Slug`.
  */
 data class PackageDraft(
     val organisationId: String,
+    val orgSlug: String,
     val sender: ShiftCustomerInput,
     val receiver: ShiftCustomerInput,
     val warehouseId: String,
@@ -97,6 +101,19 @@ data class PackageDraft(
     val widthCm: Double,
     val heightCm: Double,
     val deliveryNotes: String?,
+    /**
+     * The delivery deadline (the promise to the customer), ISO-8601. Persisted as
+     * `package_delivery_window.scheduled_arrival` and never overwritten by the planner — planner
+     * output lands in `estimated_arrival` instead.
+     */
     val scheduledArrival: String,
     val images: List<ByteArray>,
+    /**
+     * Whether the backend should assign the package to a shift as soon as it is created.
+     *
+     * The create-shift wizard MUST pass false: it creates packages and then hands their ids to
+     * `POST /api/v1/optimisation/adhoc`, which rejects a package that already belongs to an
+     * optimisation with a 409. Everywhere else wants the default — instant assignment is the point.
+     */
+    val autoAssign: Boolean = true,
 )

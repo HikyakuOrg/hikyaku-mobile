@@ -43,6 +43,35 @@ object ApiEndpoints {
     fun optimisationRunLatest(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/optimisation/run/latest"
 
     /**
+     * `POST {apiUrl}/api/v1/packages` — creates one package (row, dimensions, delivery window and
+     * opening timeline entry) in a single transaction and, unless `autoAssign` is false, assigns it
+     * to a shift straight away. Always 201 — a failed assignment comes back as an outcome on the
+     * result, not an error — except 409 for a tracking-number collision with a different payload.
+     */
+    fun packages(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/packages"
+
+    /**
+     * `POST {apiUrl}/api/v1/packages/bulk` — up to 500 packages in one call, taking the
+     * per-warehouse assignment lock once instead of once per package. Results are index-aligned
+     * with the request; one bad entry doesn't fail the batch.
+     */
+    fun packagesBulk(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/packages/bulk"
+
+    /**
+     * `POST {apiUrl}/api/v1/shifts` — opens an empty `planned` shift for a driver/vehicle/warehouse
+     * on a given service day. 409 when that driver or vehicle already has an open shift that day.
+     */
+    fun shifts(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/shifts"
+
+    /**
+     * `GET {apiUrl}/api/v1/shifts/{id}/version` — the shift's `revision`, `updatedAt`, `stopCount`
+     * and `status`, and nothing else. Deliberately cheap: the driver app polls it while the shift
+     * screen is resumed to notice a replan without refetching the route (see
+     * [org.hikyaku.mobile.shift.ShiftVersionPoll]).
+     */
+    fun shiftVersion(apiUrl: String, id: String) = "${apiUrl.trimEnd('/')}/api/v1/shifts/$id/version"
+
+    /**
      * `GET {apiUrl}/api/v1/invitations/pending` — team invitations awaiting the caller's
      * decision, matched by their own verified email (not org-scoped, no `X-Organisation-Slug`
      * needed).

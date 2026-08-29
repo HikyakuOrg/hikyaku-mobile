@@ -329,6 +329,7 @@ fun MainNavGraph(
                 val addPackageViewModel: AddPackageViewModel = viewModel {
                     AddPackageViewModel(
                         orgId = homeState.selectedOrgId.orEmpty(),
+                        orgSlug = homeState.selectedOrganisation?.slug.orEmpty(),
                         isPersonalOrg = homeState.selectedOrganisation?.isPersonal == true,
                     )
                 }

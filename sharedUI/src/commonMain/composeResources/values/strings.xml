@@ -189,6 +189,10 @@
     <string name="shift_scan_camera_unavailable">Camera scanning isn't available on this device. Enter tracking numbers manually.</string>
     <string name="shift_scan_gate_banner">Scan every package before starting the shift.</string>
     <string name="cd_shift_scan_close">Close scanner</string>
+    <!-- Live-shift visibility: a dispatcher or instant assignment changed the plan under the driver -->
+    <string name="shift_updated_packages_added">%1$s package(s) added to your shift.</string>
+    <string name="shift_updated_replanned">Your shift was updated.</string>
+    <string name="shift_updated_action_reload">Reload</string>
 
     <!-- Create shift -->
     <string name="create_shift_title">New shift</string>
@@ -309,6 +313,22 @@
     <string name="package_error_choose_arrival">Choose a scheduled arrival date and time.</string>
     <string name="package_error_save_warehouse_failed">Couldn't save the warehouse.</string>
     <string name="package_error_submit_failed">Couldn't create the package.</string>
+
+    <!-- Add package: what the backend did with it (POST /api/v1/packages assignment outcome) -->
+    <string name="package_outcome_title">Package created</string>
+    <string name="package_outcome_assigned">Added to a shift today, stop %1$s.</string>
+    <string name="package_outcome_assigned_eta">Added to a shift today, stop %1$s, arriving about %2$s.</string>
+    <string name="package_outcome_new_shift">A new shift was opened for it, stop %1$s.</string>
+    <string name="package_outcome_new_shift_eta">A new shift was opened for it, stop %1$s, arriving about %2$s.</string>
+    <string name="package_outcome_deferred">Queued. It isn\'t on a shift yet.</string>
+    <string name="package_outcome_skipped">Not added to a shift.</string>
+    <string name="package_outcome_reason_no_capacity">Today\'s shifts are full.</string>
+    <string name="package_outcome_reason_no_driver">No driver and vehicle are free today.</string>
+    <string name="package_outcome_reason_allowance">This month\'s shift allowance is used up.</string>
+    <string name="package_outcome_reason_no_geocode">The delivery address couldn\'t be placed on the map.</string>
+    <string name="package_outcome_reason_auto_assign">You\'ll add it to a shift yourself.</string>
+    <string name="package_outcome_reason_deadline">No shift today can reach it by its deadline.</string>
+    <string name="package_outcome_evicted">%1$s other package(s) moved to another shift to make room.</string>
 
     <!-- Vehicle overview -->
     <string name="vehicle_overview_title">Vehicles</string>
