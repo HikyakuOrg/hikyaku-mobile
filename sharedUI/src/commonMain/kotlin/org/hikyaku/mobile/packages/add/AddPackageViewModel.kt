@@ -369,7 +369,7 @@ class AddPackageViewModel(
 
     /** Closes the confirmation panel and leaves the form; the package is already created. */
     fun dismissAssignment() {
-        _state.value = _state.value.copy(done = true)
+        _state.value = _state.value.copy(assignment = null, done = true)
     }
 
     /**
