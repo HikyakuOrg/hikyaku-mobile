@@ -218,7 +218,8 @@ class PackageRepository(
             contentType(ContentType.Application.Json)
             setBody(
                 draft.toCreatePackageDto(
-                    // Minted client-side so the storage path below is known before the call.
+                    // Minted client-side, which is what makes a retried create replay the same
+                    // package instead of writing a second one.
                     id = newId(),
                     fromCustomerId = fromCustomerId,
                     toCustomerId = toCustomerId,
