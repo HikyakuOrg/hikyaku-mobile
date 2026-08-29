@@ -33,6 +33,7 @@ import org.hikyaku.mobile.shift.create.model.CustomerSuggestion
 import org.hikyaku.mobile.shift.create.model.ShiftCustomerInput
 import org.hikyaku.mobile.shift.create.model.WarehouseOption
 import org.hikyaku.mobile.util.combineDateAndTimeToIsoUtc
+import org.hikyaku.mobile.warehouse.canAddWarehouse
 import org.jetbrains.compose.resources.getString
 
 /** Which party a customer-field edit applies to. */
@@ -43,6 +44,12 @@ data class AddPackageUiState(
     val isSubmitting: Boolean = false,
     val error: String? = null,
     val done: Boolean = false,
+    /**
+     * What the backend did with the package, set once it has been created. Non-null is what puts
+     * the confirmation panel on screen — the form doesn't close until the driver has seen whether
+     * the package landed on a shift.
+     */
+    val assignment: PackageAssignmentDisplay? = null,
     // Dimensions
     val weight: String = "",
     val length: String = "",
@@ -59,6 +66,8 @@ data class AddPackageUiState(
     val warehouses: List<WarehouseOption> = emptyList(),
     val selectedWarehouseId: String? = null,
     val addingWarehouse: Boolean = false,
+    /** False once a personal org has reached [org.hikyaku.mobile.warehouse.PERSONAL_ORG_WAREHOUSE_LIMIT]. */
+    val canAddWarehouse: Boolean = true,
     val warehouseName: String = "",
     val warehouseQuery: String = "",
     val warehouseSuggestions: List<AddressSuggestion> = emptyList(),
@@ -78,6 +87,8 @@ data class AddPackageUiState(
  */
 class AddPackageViewModel(
     private val orgId: String,
+    private val orgSlug: String,
+    private val isPersonalOrg: Boolean,
     private val repository: PackageRepository = PackageRepository(),
     private val geocodeRepository: GeocodeRepository = GeocodeRepository(),
 ) : ViewModel() {
@@ -102,11 +113,13 @@ class AddPackageViewModel(
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
             val warehouses = repository.fetchWarehouses(orgId).getOrDefault(emptyList())
+            val canAdd = canAddWarehouse(isPersonalOrg, warehouses.size)
             _state.value = _state.value.copy(
                 isLoading = false,
                 warehouses = warehouses,
                 selectedWarehouseId = warehouses.singleOrNull()?.id,
-                addingWarehouse = warehouses.isEmpty(),
+                addingWarehouse = warehouses.isEmpty() && canAdd,
+                canAddWarehouse = canAdd,
             )
         }
     }
@@ -247,6 +260,7 @@ class AddPackageViewModel(
     }
 
     fun startAddWarehouse() {
+        if (!_state.value.canAddWarehouse) return
         _state.value = _state.value.copy(addingWarehouse = true, selectedWarehouseId = null)
     }
 
@@ -317,8 +331,13 @@ class AddPackageViewModel(
                 )
                 return@launch
             }
+            // validationProblem already refused a submit with no arrival date.
+            val arrivalDateMillis = checkNotNull(s.arrivalDateMillis) {
+                "validationProblem should have rejected a package with no arrival date."
+            }
             val draft = PackageDraft(
                 organisationId = orgId,
+                orgSlug = orgSlug,
                 sender = customerInput(s.sender),
                 receiver = customerInput(s.receiver),
                 warehouseId = warehouse.id,
@@ -327,11 +346,18 @@ class AddPackageViewModel(
                 widthCm = s.width.trim().toDouble(),
                 heightCm = s.height.trim().toDouble(),
                 deliveryNotes = s.deliveryNotes.trim(),
-                scheduledArrival = combineDateAndTimeToIsoUtc(s.arrivalDateMillis!!, s.arrivalHour, s.arrivalMinute),
+                scheduledArrival = combineDateAndTimeToIsoUtc(arrivalDateMillis, s.arrivalHour, s.arrivalMinute),
                 images = s.images,
+                // Default (true): a package added here should be on a shift before the driver has
+                // put their phone away. Only the create-shift wizard opts out.
             )
             repository.createPackage(draft)
-                .onSuccess { _state.value = _state.value.copy(isSubmitting = false, done = true) }
+                .onSuccess { result ->
+                    _state.value = _state.value.copy(
+                        isSubmitting = false,
+                        assignment = result.assignment.toDisplay(),
+                    )
+                }
                 .onFailure {
                     _state.value = _state.value.copy(
                         isSubmitting = false,
@@ -341,10 +367,21 @@ class AddPackageViewModel(
         }
     }
 
+    /** Closes the confirmation panel and leaves the form; the package is already created. */
+    fun dismissAssignment() {
+        _state.value = _state.value.copy(assignment = null, done = true)
+    }
+
+    /**
+     * [validationProblem] refuses a party with no picked address before this runs, so the address is
+     * always present here — the check names the broken invariant if that ordering ever changes.
+     */
     private fun customerInput(draft: CustomerDraft): ShiftCustomerInput = ShiftCustomerInput(
         name = draft.name.trim(),
         phoneE164 = customerE164(draft),
-        address = draft.picked!!,
+        address = checkNotNull(draft.picked) {
+            "validationProblem should have rejected ${draft.localId} with no geocoded address."
+        },
     )
 
     private suspend fun resolveWarehouse(s: AddPackageUiState): WarehouseOption? {

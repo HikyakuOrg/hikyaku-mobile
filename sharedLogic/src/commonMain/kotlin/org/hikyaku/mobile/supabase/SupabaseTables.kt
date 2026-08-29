@@ -28,6 +28,16 @@ object SupabaseTables {
     const val CUSTOMER = "customer"
 }
 
+/** Postgres RPC function names invoked via `client.postgrest.rpc(...)`. */
+object SupabaseFunctions {
+    /**
+     * Returns a driver's `driver_location_history` rows (lat/lng already extracted from the
+     * PostGIS `location` column) within a `[from_ts, to_ts]` window. Shared with the web
+     * dashboard's driver-tracking view.
+     */
+    const val GET_DRIVER_LOCATION_HISTORY = "get_driver_location_history"
+}
+
 /** Storage bucket names used via `client.storage.from(...)`. */
 object SupabaseBuckets {
     /** Private bucket holding proof-of-delivery photos, keyed by `{packageId}/...`. */

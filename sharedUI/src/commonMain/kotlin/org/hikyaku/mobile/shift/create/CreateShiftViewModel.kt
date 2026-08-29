@@ -44,6 +44,7 @@ import org.hikyaku.mobile.shift.create.model.ShiftSubmission
 import org.hikyaku.mobile.shift.create.model.VehicleOption
 import org.hikyaku.mobile.shift.create.model.WarehouseOption
 import org.hikyaku.mobile.util.combineDateAndTimeToIsoUtc
+import org.hikyaku.mobile.warehouse.canAddWarehouse
 import org.jetbrains.compose.resources.getString
 
 /** Steps of the create-shift wizard. */
@@ -83,6 +84,8 @@ data class CreateShiftUiState(
     val warehouses: List<WarehouseOption> = emptyList(),
     val selectedWarehouseId: String? = null,
     val addingWarehouse: Boolean = false,
+    /** False once a personal org has reached [org.hikyaku.mobile.warehouse.PERSONAL_ORG_WAREHOUSE_LIMIT]. */
+    val canAddWarehouse: Boolean = true,
     val warehouseName: String = "",
     val warehouseQuery: String = "",
     val warehouseSuggestions: List<AddressSuggestion> = emptyList(),
@@ -123,6 +126,7 @@ data class CreateShiftUiState(
 class CreateShiftViewModel(
     private val orgId: String,
     private val orgSlug: String,
+    private val isPersonalOrg: Boolean,
     private val repository: CreateShiftRepository = CreateShiftRepository(),
     private val geocodeRepository: GeocodeRepository = GeocodeRepository(),
     private val packageRepository: PackageRepository = PackageRepository(),
@@ -215,13 +219,15 @@ class CreateShiftViewModel(
             } else {
                 warehouses.singleOrNull()?.id
             }
+            val canAdd = canAddWarehouse(isPersonalOrg, warehouses.size)
             _state.value = _state.value.copy(
                 isLoading = false,
                 vehicles = vehicles,
                 selectedVehicleId = selectedVehicleId,
                 warehouses = warehouses,
                 selectedWarehouseId = selectedWarehouseId,
-                addingWarehouse = restoredDraft?.addingWarehouse ?: warehouses.isEmpty(),
+                addingWarehouse = (restoredDraft?.addingWarehouse ?: warehouses.isEmpty()) && canAdd,
+                canAddWarehouse = canAdd,
             )
             // Resume mid-flow: the draft may have already moved past Details, so the picked
             // packages for its resolved warehouse need to be reloaded (availablePackages isn't
@@ -259,6 +265,7 @@ class CreateShiftViewModel(
     }
 
     fun startAddWarehouse() {
+        if (!_state.value.canAddWarehouse) return
         _state.value = _state.value.copy(addingWarehouse = true, selectedWarehouseId = null)
     }
 
@@ -483,32 +490,46 @@ class CreateShiftViewModel(
             val problem = newPackageProblem(s)
             if (problem != null) return@launch setError(problem)
 
+            // Both are guaranteed by the guards above: newPackageProblem rejects a missing arrival
+            // date, and the Packages step is only reachable once `next` has resolved a warehouse.
+            val warehouseId = checkNotNull(s.resolvedWarehouseId) {
+                "Reached the Packages step without a resolved warehouse."
+            }
+            val arrivalDateMillis = checkNotNull(s.packageArrivalDateMillis) {
+                "newPackageProblem should have rejected a package with no arrival date."
+            }
+
             _state.value = _state.value.copy(isCreatingPackage = true, error = null)
             val draft = PackageDraft(
                 organisationId = orgId,
+                orgSlug = orgSlug,
                 sender = packageCustomerInput(s.packageSender),
                 receiver = packageCustomerInput(s.packageReceiver),
-                warehouseId = s.resolvedWarehouseId!!,
+                warehouseId = warehouseId,
                 weightKg = s.packageWeight.trim().toDouble(),
                 lengthCm = s.packageLength.trim().toDouble(),
                 widthCm = s.packageWidth.trim().toDouble(),
                 heightCm = s.packageHeight.trim().toDouble(),
                 deliveryNotes = s.packageDeliveryNotes.trim(),
                 scheduledArrival = combineDateAndTimeToIsoUtc(
-                    s.packageArrivalDateMillis!!,
+                    arrivalDateMillis,
                     s.packageArrivalHour,
                     s.packageArrivalMinute,
                 ),
                 images = s.packageImages,
+                // The wizard hands these ids to POST /optimisation/adhoc a step later, and that
+                // endpoint 409s on a package that already belongs to an optimisation. Letting the
+                // backend assign here would break the wizard on its first use.
+                autoAssign = false,
             )
             packageRepository.createPackage(draft)
-                .onSuccess { newId ->
+                .onSuccess { result ->
                     _state.value = _state.value.copy(
                         isCreatingPackage = false,
                         showAddPackageForm = false,
-                        selectedPackageIds = _state.value.selectedPackageIds + newId,
+                        selectedPackageIds = _state.value.selectedPackageIds + result.`package`.id,
                     )
-                    loadPackages(s.resolvedWarehouseId)
+                    loadPackages(warehouseId)
                 }
                 .onFailure {
                     _state.value = _state.value.copy(
@@ -519,10 +540,16 @@ class CreateShiftViewModel(
         }
     }
 
+    /**
+     * [newPackageProblem] rejects a party with no picked address before this runs, so the address is
+     * always present here — the check names the broken invariant if that ordering ever changes.
+     */
     private fun packageCustomerInput(draft: CustomerDraft): ShiftCustomerInput = ShiftCustomerInput(
         name = draft.name.trim(),
         phoneE164 = customerE164(draft),
-        address = draft.picked!!,
+        address = checkNotNull(draft.picked) {
+            "newPackageProblem should have rejected ${draft.localId} with no geocoded address."
+        },
     )
 
     private suspend fun newPackageProblem(s: CreateShiftUiState): String? {
@@ -646,6 +673,10 @@ class CreateShiftViewModel(
                 return@launch
             }
             // The DatePicker returns midnight UTC of the chosen day; departure adds the picked time.
+            // detailsProblem refuses to leave the Details step without a date, so it is set here.
+            val startDateMillis = checkNotNull(s.startDateMillis) {
+                "detailsProblem should have rejected a shift with no start date."
+            }
             // driverId isn't collected here — the repository fills it in from the caller's own
             // session, since a driver can only create a shift for themselves.
             val submission = ShiftSubmission(
@@ -653,7 +684,7 @@ class CreateShiftViewModel(
                 orgSlug = orgSlug,
                 warehouseId = warehouseId,
                 vehicleId = selectedVehicle.id,
-                startDateTime = combineDateAndTimeToIsoUtc(s.startDateMillis!!, s.startHour, s.startMinute),
+                startDateTime = combineDateAndTimeToIsoUtc(startDateMillis, s.startHour, s.startMinute),
                 packageIds = s.selectedPackageIds.toList(),
             )
             repository.submitShift(submission)

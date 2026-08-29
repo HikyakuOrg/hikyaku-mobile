@@ -44,6 +44,10 @@ data class ShiftSession(
     val depotLat: Double? = null,
     /** Depot longitude, cached for the headless service's proximity check. */
     val depotLng: Double? = null,
+    /** Wall-clock time (ISO-8601) tracking began, so a completed shift can look up its own breadcrumb trail. */
+    val startedAt: String? = null,
+    /** Wall-clock time (ISO-8601) the shift reached [ShiftPhase.COMPLETE], for the same lookup. */
+    val endedAt: String? = null,
 ) {
     /** True while this session represents an active shift the app should resume. */
     val isActive: Boolean get() = phase == ShiftPhase.IN_PROGRESS || phase == ShiftPhase.RETURNING_TO_DEPOT

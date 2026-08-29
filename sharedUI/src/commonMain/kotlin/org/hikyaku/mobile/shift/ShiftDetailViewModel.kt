@@ -13,6 +13,7 @@ import io.github.jan.supabase.storage.StorageItem
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -47,9 +48,17 @@ import org.hikyaku.mobile.shift.tracking.ShiftTracker
 import org.hikyaku.mobile.tracking.buildTrackingUrl
 import org.hikyaku.mobile.tracking.parseScannedTrackingNumber
 import org.jetbrains.compose.resources.getString
+import org.maplibre.spatialk.geojson.Point
 import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.Instant
+
+/**
+ * Margin applied to both ends of the [ShiftDetailViewModel.shiftStartedAt]..[ShiftDetailViewModel.shiftEndedAt]
+ * window when querying `driver_location_history`, so a client/server clock skew of a few seconds
+ * can't clip the first or last breadcrumb of the shift just driven.
+ */
+private val ROUTE_HISTORY_PADDING = 10.seconds
 
 /**
  * Drives the shift-details screen: loads the shift's routes, and for the selected route its
@@ -74,6 +83,8 @@ class ShiftDetailViewModel(
     private val routePoiRepository: RoutePoiRepository = RoutePoiRepository(),
     private val actionsRepository: ShiftActionsRepository = ShiftActionsRepository(),
     private val editRepository: ShiftEditRepository = ShiftEditRepository(),
+    private val routeHistoryRepository: ShiftRouteHistoryRepository = ShiftRouteHistoryRepository(),
+    private val versionRepository: ShiftVersionRepository = ShiftVersionRepository(),
     private val statusCatalog: PackageStatusCatalog = PackageStatusCatalog(),
     private val locationProvider: LocationProvider = LocationProvider(),
     private val sessionStore: ShiftSessionStore = ShiftSessionStore(),
@@ -129,6 +140,12 @@ class ShiftDetailViewModel(
         val atWarehouse: Boolean = false,
         /** True once deliveries are done and the driver is back at the depot. */
         val shiftComplete: Boolean = false,
+        /** True while the "route you travelled" map is open. */
+        val showTravelledRoute: Boolean = false,
+        val isLoadingTravelledRoute: Boolean = false,
+        /** The completed shift's breadcrumb trail, oldest point first. */
+        val travelledRoute: List<Point> = emptyList(),
+        val travelledRouteError: String? = null,
         val isActionInProgress: Boolean = false,
         val actionError: String? = null,
         /** True when the auto-start safety net may be armed for this route (scheduled & within window). */
@@ -154,6 +171,13 @@ class ShiftDetailViewModel(
         val editError: String? = null,
         /** The add-stop form, non-null while the add-stop sheet is open. */
         val addStop: AddStopDraft? = null,
+        // --- live-shift visibility ---
+        /**
+         * Set when the 30-second version poll notices the plan changed under the driver. Rendered as
+         * a snackbar offering a reload — never acted on automatically, since silently re-routing a
+         * driver mid-shift is a safety problem.
+         */
+        val shiftUpdate: ShiftUpdateNotice? = null,
     ) {
         val jobStops: List<RouteStep> get() = steps.filter { it.isJob }
 
@@ -243,8 +267,22 @@ class ShiftDetailViewModel(
     /** Streams the driver's location in-process (iOS/desktop only); cancelled on completion/clear. */
     private var locationJob: Job? = null
 
+    /** Decides when to poll the shift version and whether an answer is worth reporting. */
+    private val versionPoll = ShiftVersionPoll()
+
+    /** The version-poll loop; runs only between [onResumed] and [onPaused]. */
+    private var versionPollJob: Job? = null
+
     /** Dispatcher-set scheduled start (ISO-8601) for this shift, fetched once; gates auto-start. */
     private var scheduledStart: String? = null
+
+    /**
+     * Wall-clock start/end of the *running* shift (not [scheduledStart]), captured so a completed
+     * shift can look up its own slice of `driver_location_history`. Set on [startShift] (or
+     * restored from the persisted session on resume) and on completion; see [buildSession].
+     */
+    private var shiftStartedAt: Instant? = null
+    private var shiftEndedAt: Instant? = null
 
     // Duplicate-frame guard for the QR scanner: `QrScanner.onCompletion` fires on every decoded
     // frame while a label is held in view, so one physical scan would otherwise fire a burst of
@@ -306,6 +344,11 @@ class ShiftDetailViewModel(
     private fun loadRoute(routeId: String, resume: ShiftSession? = null) {
         locationJob?.cancel()
         locationJob = null
+        shiftStartedAt = null
+        shiftEndedAt = null
+        // Whatever the server reports next is what the driver is now looking at, so it must not be
+        // announced as a change.
+        versionPoll.reset()
         _state.value = _state.value.copy(
             isLoadingRoute = true,
             routeError = null,
@@ -322,6 +365,10 @@ class ShiftDetailViewModel(
             deliveriesComplete = false,
             atWarehouse = false,
             shiftComplete = false,
+            showTravelledRoute = false,
+            isLoadingTravelledRoute = false,
+            travelledRoute = emptyList(),
+            travelledRouteError = null,
             isActionInProgress = false,
             actionError = null,
             autoStartEligible = false,
@@ -330,6 +377,7 @@ class ShiftDetailViewModel(
             durationSeconds = _state.value.routes.firstOrNull { it.id == routeId }?.duration?.toDouble(),
             vehicleLabel = null,
             recipients = emptyMap(),
+            shiftUpdate = null,
         )
         viewModelScope.launch {
             repository.fetchRouteSteps(routeId)
@@ -375,6 +423,7 @@ class ShiftDetailViewModel(
 
     /** Re-applies a persisted session over freshly-fetched (authoritative) steps and resumes tracking. */
     private fun applyResume(session: ShiftSession, steps: List<RouteStep>) {
+        shiftStartedAt = session.startedAt?.let { runCatching { Instant.parse(it) }.getOrNull() }
         _state.value = _state.value.copy(
             shiftStarted = true,
             inTransitPackageId = session.inTransitPackageId,
@@ -585,6 +634,62 @@ class ShiftDetailViewModel(
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Live-shift visibility: the app has no realtime and no push, so a package the backend assigns
+    // to this shift after it was opened is invisible until a refresh. A 30-second poll of the cheap
+    // GET /shifts/{id}/version endpoint closes that gap while the screen is on top.
+    // -----------------------------------------------------------------------
+
+    /**
+     * Starts the version poll. Driven by the screen's `ON_RESUME`, so it costs nothing while the app
+     * is backgrounded or the driver is on another screen. Polls once immediately — returning to the
+     * screen is exactly when a stale plan matters most — then every [VERSION_POLL_INTERVAL].
+     */
+    fun onResumed() {
+        val pollNow = versionPoll.resume()
+        versionPollJob?.cancel()
+        versionPollJob = viewModelScope.launch {
+            if (pollNow) pollShiftVersion()
+            while (true) {
+                delay(VERSION_POLL_INTERVAL)
+                pollShiftVersion()
+            }
+        }
+    }
+
+    /** Stops the version poll. Driven by the screen's `ON_PAUSE`; also called from [onCleared]. */
+    fun onPaused() {
+        versionPoll.pause()
+        versionPollJob?.cancel()
+        versionPollJob = null
+    }
+
+    /**
+     * One version check. A failure is deliberately silent: this is a background nicety, and a
+     * banner about a failed poll would be noise a driver can do nothing with. The route the driver
+     * is looking at stays exactly as it is either way.
+     */
+    private suspend fun pollShiftVersion() {
+        if (!versionPoll.shouldPoll(_state.value.shiftStarted)) return
+        val version = versionRepository.fetchVersion(orgSlug, shiftId).getOrNull() ?: return
+        val notice = versionPoll.observe(version) ?: return
+        _state.value = _state.value.copy(shiftUpdate = notice)
+    }
+
+    /** Dismisses the update snackbar without reloading — the driver chose to keep their plan. */
+    fun dismissShiftUpdate() {
+        _state.value = _state.value.copy(shiftUpdate = null)
+    }
+
+    /**
+     * Accepts the offered reload. Goes through [loadRoutes] rather than [loadRoute] so a shift that
+     * is mid-run is restored from its persisted session instead of being reset to "not started".
+     */
+    fun reloadAfterShiftUpdate() {
+        _state.value = _state.value.copy(shiftUpdate = null)
+        loadRoutes()
+    }
+
     /**
      * Validates and (if accepted) submits a scanned or manually-entered code. Order matters: each
      * step maps to one of the required rejection cases (unknown code, code for a package that isn't
@@ -706,6 +811,7 @@ class ShiftDetailViewModel(
             }
             started
                 .onSuccess {
+                    shiftStartedAt = Clock.System.now()
                     val overrides = firstPackageId
                         ?.let { _state.value.statusOverrides + (it to ShiftStatus.IN_TRANSIT) }
                         ?: _state.value.statusOverrides
@@ -918,6 +1024,8 @@ class ShiftDetailViewModel(
             deliveriesComplete = deliveriesComplete,
             depotLat = depot?.first,
             depotLng = depot?.second,
+            startedAt = shiftStartedAt?.toString(),
+            endedAt = shiftEndedAt?.toString(),
         )
     }
 
@@ -1003,6 +1111,7 @@ class ShiftDetailViewModel(
     private fun recomputeCompletion() {
         val s = _state.value
         if (s.deliveriesComplete && s.atWarehouse && !s.shiftComplete) {
+            shiftEndedAt = Clock.System.now()
             _state.value = s.copy(shiftComplete = true)
             locationJob?.cancel()
             locationJob = null
@@ -1018,6 +1127,50 @@ class ShiftDetailViewModel(
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Post-shift breadcrumb trail: once complete, the driver can see the route they actually
+    // drove, read from `driver_location_history` for [shiftStartedAt]..[shiftEndedAt].
+    // -----------------------------------------------------------------------
+
+    /** Opens the route-travelled map, fetching it the first time (or after a failed attempt). */
+    fun openTravelledRoute() {
+        _state.value = _state.value.copy(showTravelledRoute = true)
+        if (_state.value.travelledRoute.isEmpty() && !_state.value.isLoadingTravelledRoute) loadTravelledRoute()
+    }
+
+    fun closeTravelledRoute() {
+        _state.value = _state.value.copy(showTravelledRoute = false)
+    }
+
+    fun retryTravelledRoute() = loadTravelledRoute()
+
+    private fun loadTravelledRoute() {
+        val startedAt = shiftStartedAt
+        if (startedAt == null) {
+            // Shouldn't happen (shiftComplete only follows a real startShift/resume), but without a
+            // start time there's no way to bound the query, so fail rather than guess a range.
+            _state.value = _state.value.copy(travelledRouteError = "No start time recorded for this shift.")
+            return
+        }
+        val endedAt = shiftEndedAt ?: Clock.System.now()
+        _state.value = _state.value.copy(isLoadingTravelledRoute = true, travelledRouteError = null)
+        viewModelScope.launch {
+            routeHistoryRepository.fetchTravelledRoute(
+                fromIso = (startedAt - ROUTE_HISTORY_PADDING).toString(),
+                toIso = (endedAt + ROUTE_HISTORY_PADDING).toString(),
+            )
+                .onSuccess { points ->
+                    _state.value = _state.value.copy(isLoadingTravelledRoute = false, travelledRoute = points)
+                }
+                .onFailure { error ->
+                    _state.value = _state.value.copy(
+                        isLoadingTravelledRoute = false,
+                        travelledRouteError = error.message ?: "Couldn't load your route.",
+                    )
+                }
+        }
+    }
+
     /**
      * Reflects completion that may have happened in the background service: when the persisted
      * session for this shift reaches [ShiftPhase.COMPLETE], show the completed state and clear it.
@@ -1030,6 +1183,8 @@ class ShiftDetailViewModel(
                     session.phase == ShiftPhase.COMPLETE &&
                     !_state.value.shiftComplete
                 ) {
+                    shiftStartedAt = session.startedAt?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: shiftStartedAt
+                    shiftEndedAt = session.endedAt?.let { runCatching { Instant.parse(it) }.getOrNull() } ?: Clock.System.now()
                     _state.value = _state.value.copy(
                         deliveriesComplete = true,
                         atWarehouse = true,
@@ -1052,7 +1207,18 @@ class ShiftDetailViewModel(
         // On Android the foreground service must outlive the ViewModel/Activity (that's the point
         // of resume-on-kill), so only the in-process stream used elsewhere is cancelled here.
         if (!tracker.handlesLocationStreaming) locationJob?.cancel()
+        // The version poll, by contrast, is purely a screen concern and dies with the screen.
+        onPaused()
         super.onCleared()
+    }
+
+    private companion object {
+        /**
+         * How often the shift version is re-checked while the screen is resumed. Thirty seconds is
+         * the plan's deliberate floor: the request is a single indexed row read, and anything slower
+         * leaves a driver looking at a stale route for longer than they'd tolerate.
+         */
+        val VERSION_POLL_INTERVAL = 30.seconds
     }
 }
 

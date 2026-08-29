@@ -59,6 +59,8 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -93,6 +95,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import io.github.jan.supabase.storage.StorageItem
@@ -106,6 +109,7 @@ import org.hikyaku.mobile.map.mapLayersSupported
 import org.hikyaku.mobile.share.rememberShareText
 import org.hikyaku.mobile.shift.scan.ScanPackagesOverlay
 import org.hikyaku.mobile.theme.HikyakuTheme
+import org.hikyaku.mobile.toast.LocalToastHostState
 import org.hikyaku.mobile.toast.ToastEffect
 import org.hikyaku.mobile.util.combineDateAndTimeToIsoUtc
 import org.hikyaku.mobile.util.epochMillisToDisplayDate
@@ -167,6 +171,11 @@ import hikyaku.sharedui.generated.resources.shift_trip_duration
 import hikyaku.sharedui.generated.resources.shift_trip_start
 import hikyaku.sharedui.generated.resources.shift_trip_vehicle
 import hikyaku.sharedui.generated.resources.shift_unknown_recipient
+import hikyaku.sharedui.generated.resources.shift_updated_action_reload
+import hikyaku.sharedui.generated.resources.shift_updated_packages_added
+import hikyaku.sharedui.generated.resources.shift_updated_replanned
+import hikyaku.sharedui.generated.resources.shift_view_travelled_route
+import hikyaku.sharedui.generated.resources.shift_travelled_route_empty
 import org.hikyaku.mobile.shift.detail.model.Customer
 import org.hikyaku.mobile.shift.detail.model.PackageAssignment
 import org.hikyaku.mobile.shift.detail.model.PackageInfo
@@ -256,6 +265,18 @@ fun ShiftDetailScreen(
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
+    // The 30-second shift-version poll runs only while this screen is actually on top: a
+    // backgrounded app has nobody to tell, and the driver is the only reason to spend the request.
+    LifecycleResumeEffect(viewModel) {
+        viewModel.onResumed()
+        onPauseOrDispose { viewModel.onPaused() }
+    }
+    ShiftUpdateSnackbar(
+        notice = state.shiftUpdate,
+        onReload = viewModel::reloadAfterShiftUpdate,
+        onDismiss = viewModel::dismissShiftUpdate,
+    )
+
     ShiftDetailScreenContent(
         state = state,
         orgName = viewModel.orgName,
@@ -277,6 +298,9 @@ fun ShiftDetailScreen(
         onConfirmAddStop = viewModel::confirmAddStop,
         onStartShift = viewModel::startShift,
         onArmAutoStart = viewModel::armAutoStart,
+        onViewTravelledRoute = viewModel::openTravelledRoute,
+        onCloseTravelledRoute = viewModel::closeTravelledRoute,
+        onRetryTravelledRoute = viewModel::retryTravelledRoute,
         onOpenScanner = viewModel::openScanner,
         onCloseScanner = viewModel::closeScanner,
         onToggleFlashlight = viewModel::toggleFlashlight,
@@ -314,6 +338,9 @@ private fun ShiftDetailScreenContent(
     onConfirmAddStop: () -> Unit,
     onStartShift: () -> Unit,
     onArmAutoStart: () -> Unit,
+    onViewTravelledRoute: () -> Unit,
+    onCloseTravelledRoute: () -> Unit,
+    onRetryTravelledRoute: () -> Unit,
     onOpenScanner: () -> Unit,
     onCloseScanner: () -> Unit,
     onToggleFlashlight: () -> Unit,
@@ -432,7 +459,9 @@ private fun ShiftDetailScreenContent(
             state.isLoadingRoutes -> CenteredSpinner(Modifier.fillMaxSize().padding(padding))
 
             state.routesError != null -> RetryCard(
-                message = state.routesError!!,
+                // `state` is read through a `by` delegate, so each access is a fresh getValue() call
+                // and the `!= null` guard above can't smart-cast. The guard makes this never blank.
+                message = state.routesError.orEmpty(),
                 onRetry = onLoadRoutes,
                 modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             )
@@ -476,6 +505,12 @@ private fun ShiftDetailScreenContent(
 
                 if (state.shiftComplete) {
                     item { InfoBanner(stringResource(Res.string.shift_complete_banner), success = true) }
+                    item {
+                        OutlinedButton(
+                            onClick = onViewTravelledRoute,
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                        ) { Text(stringResource(Res.string.shift_view_travelled_route)) }
+                    }
                 } else if (state.deliveriesComplete) {
                     item { InfoBanner(stringResource(Res.string.shift_all_delivered_banner)) }
                 }
@@ -507,7 +542,7 @@ private fun ShiftDetailScreenContent(
                 } else if (state.routeError != null) {
                     item {
                         RetryCard(
-                            message = state.routeError!!,
+                            message = state.routeError.orEmpty(),
                             onRetry = { state.selectedRouteId?.let(onSelectRoute) },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         )
@@ -587,6 +622,14 @@ private fun ShiftDetailScreenContent(
 
     if (showFullMap) {
         FullScreenRouteMap(state = state, onDismiss = { showFullMap = false })
+    }
+
+    if (state.showTravelledRoute) {
+        TravelledRouteDialog(
+            state = state,
+            onDismiss = onCloseTravelledRoute,
+            onRetry = onRetryTravelledRoute,
+        )
     }
 
     if (showPermissionRationale) {
@@ -696,6 +739,9 @@ private fun ShiftDetailScreenPreview() {
             onConfirmAddStop = {},
             onStartShift = {},
             onArmAutoStart = {},
+            onViewTravelledRoute = {},
+            onCloseTravelledRoute = {},
+            onRetryTravelledRoute = {},
             onOpenScanner = {},
             onCloseScanner = {},
             onToggleFlashlight = {},
@@ -972,6 +1018,118 @@ private fun FullScreenRouteMap(state: ShiftDetailViewModel.UiState, onDismiss: (
                     Icon(Icons.Filled.Close, contentDescription = stringResource(Res.string.action_dismiss))
                 }
             }
+        }
+    }
+}
+
+/**
+ * The full-screen "route you travelled" map: the driver's own breadcrumb trail for the shift just
+ * completed, read from `driver_location_history`. Shown from the shift-complete banner.
+ */
+@Composable
+private fun TravelledRouteDialog(
+    state: ShiftDetailViewModel.UiState,
+    onDismiss: () -> Unit,
+    onRetry: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.surface)) {
+            when {
+                state.isLoadingTravelledRoute -> CenteredSpinner(Modifier.fillMaxSize())
+                state.travelledRouteError != null -> RetryCard(
+                    message = state.travelledRouteError,
+                    onRetry = onRetry,
+                    modifier = Modifier.align(Alignment.Center).padding(16.dp),
+                )
+                state.travelledRoute.size < 2 -> Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(Res.string.shift_travelled_route_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(24.dp),
+                    )
+                }
+                else -> TravelledRouteMapView(points = state.travelledRoute, modifier = Modifier.fillMaxSize())
+            }
+            Surface(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
+                shape = CircleShape,
+                shadowElevation = 3.dp,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .windowInsetsPadding(WindowInsets.statusBars)
+                    .padding(12.dp),
+            ) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.Filled.Close, contentDescription = stringResource(Res.string.action_dismiss))
+                }
+            }
+        }
+    }
+}
+
+/** Draws [points] (oldest first) as a line, with distinct start/end markers, fit to the camera bounds. */
+@Composable
+private fun TravelledRouteMapView(points: List<Point>, modifier: Modifier = Modifier) {
+    val positions = points.map { Position(longitude = it.longitude, latitude = it.latitude) }
+    val cameraState = rememberCameraState(
+        firstPosition = CameraPosition(target = positions.first(), zoom = 13.0),
+    )
+    LaunchedEffect(positions) {
+        val longitudes = positions.map { it.longitude }
+        val latitudes = positions.map { it.latitude }
+        val bounds = BoundingBox(
+            southwest = Position(longitude = longitudes.min(), latitude = latitudes.min()),
+            northeast = Position(longitude = longitudes.max(), latitude = latitudes.max()),
+        )
+        cameraState.animateTo(bounds, padding = PaddingValues(32.dp))
+    }
+
+    MaplibreMap(
+        modifier = modifier,
+        baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
+        cameraState = cameraState,
+        options = MapOptions(ornamentOptions = routeMapOrnamentOptions()),
+    ) {
+        // Desktop MapLibre Compose can't render sources/layers yet; show the base map only there.
+        if (mapLayersSupported) {
+            val lineSource = rememberGeoJsonSource(
+                GeoJsonData.Features(Feature(LineString(positions), properties = null)),
+            )
+            LineLayer(
+                id = "travelled-route-line",
+                source = lineSource,
+                color = const(ROUTE_OUTBOUND_COLOR),
+                width = const(4.dp),
+                cap = const(LineCap.Round),
+                join = const(LineJoin.Round),
+            )
+
+            val startSource = rememberGeoJsonSource(
+                GeoJsonData.Features(Feature(Point(positions.first()), properties = null)),
+            )
+            CircleLayer(
+                id = "travelled-route-start",
+                source = startSource,
+                color = const(DEPOT_COLOR),
+                radius = const(9.dp),
+                strokeColor = const(Color.White),
+                strokeWidth = const(3.dp),
+            )
+
+            val endSource = rememberGeoJsonSource(
+                GeoJsonData.Features(Feature(Point(positions.last()), properties = null)),
+            )
+            CircleLayer(
+                id = "travelled-route-end",
+                source = endSource,
+                color = const(ROUTE_RETURN_COLOR),
+                radius = const(9.dp),
+                strokeColor = const(Color.White),
+                strokeWidth = const(3.dp),
+            )
         }
     }
 }
@@ -1798,5 +1956,38 @@ private fun RetryCard(
             Spacer(Modifier.height(8.dp))
             TextButton(onClick = onRetry) { Text(retryLabel) }
         }
+    }
+}
+
+/**
+ * Tells the driver their shift changed under them and offers a reload — it never reloads on its
+ * own. Instant assignment can add a stop to a shift the driver already has open, and silently
+ * re-routing someone who is following a route is a safety problem, not a UX nicety. Dismissing the
+ * snackbar keeps the plan they are looking at.
+ */
+@Composable
+private fun ShiftUpdateSnackbar(
+    notice: ShiftUpdateNotice?,
+    onReload: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val hostState = LocalToastHostState.current
+    val message = notice?.let {
+        if (it.addedStops > 0) {
+            stringResource(Res.string.shift_updated_packages_added, it.addedStops.toString())
+        } else {
+            stringResource(Res.string.shift_updated_replanned)
+        }
+    }
+    val reloadLabel = stringResource(Res.string.shift_updated_action_reload)
+    // Keyed on the revision so a second change re-shows the snackbar rather than being swallowed.
+    LaunchedEffect(notice?.revision) {
+        if (message == null) return@LaunchedEffect
+        val result = hostState.showSnackbar(
+            message = message,
+            actionLabel = reloadLabel,
+            duration = SnackbarDuration.Long,
+        )
+        if (result == SnackbarResult.ActionPerformed) onReload() else onDismiss()
     }
 }

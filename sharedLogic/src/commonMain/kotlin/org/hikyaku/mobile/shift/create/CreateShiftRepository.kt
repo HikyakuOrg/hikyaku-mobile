@@ -263,9 +263,13 @@ class CreateShiftRepository(
 }
 
 /**
- * Thrown when the adhoc optimiser rejects [CreateShiftRepository.submitShift] with a 409 because a
- * submitted package has since been claimed by another shift's optimisation — e.g. the wizard's
- * available-packages snapshot went stale between the Packages step and submission.
+ * A 409 from a package-facing endpoint, where the conflict is always "this package is already
+ * spoken for" rather than a transport failure:
+ * - [CreateShiftRepository.submitShift] — the adhoc optimiser rejects a submitted package that has
+ *   since been claimed by another shift's optimisation (the wizard's available-packages snapshot
+ *   went stale between the Packages step and submission).
+ * - [org.hikyaku.mobile.packages.PackageRepository.createPackage] — the tracking number already
+ *   belongs to a package with a different payload.
  */
 class PackageConflictException(message: String) : Exception(message)
 

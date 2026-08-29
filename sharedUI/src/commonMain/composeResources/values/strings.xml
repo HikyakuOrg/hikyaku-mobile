@@ -23,8 +23,8 @@
     <string name="cd_country_selector">Country selector</string>
     <string name="cd_package_photo">Package photo</string>
     <string name="cd_open_navigation_menu">Open navigation menu</string>
-    <string name="cd_previous_month">Previous month</string>
-    <string name="cd_next_month">Next month</string>
+    <string name="cd_previous_week">Previous week</string>
+    <string name="cd_next_week">Next week</string>
 
     <!-- Navigation drawer -->
     <string name="nav_home">Home</string>
@@ -130,6 +130,8 @@
     <string name="shift_no_routes">This shift has no routes.</string>
     <string name="shift_complete_banner">Shift complete — you're back at the warehouse.</string>
     <string name="shift_all_delivered_banner">All stops delivered. Return to the warehouse to finish the shift.</string>
+    <string name="shift_view_travelled_route">View your route</string>
+    <string name="shift_travelled_route_empty">No location data was recorded for this shift.</string>
     <string name="shift_permission_required_message">Background location ("Allow all the time") and notifications are required to keep tracking your shift in the background. Enable them in settings, then start the shift.</string>
     <string name="shift_start_button">Start shift</string>
     <string name="shift_start_permission_title">Allow location &amp; notifications</string>
@@ -187,6 +189,10 @@
     <string name="shift_scan_camera_unavailable">Camera scanning isn't available on this device. Enter tracking numbers manually.</string>
     <string name="shift_scan_gate_banner">Scan every package before starting the shift.</string>
     <string name="cd_shift_scan_close">Close scanner</string>
+    <!-- Live-shift visibility: a dispatcher or instant assignment changed the plan under the driver -->
+    <string name="shift_updated_packages_added">%1$s package(s) added to your shift.</string>
+    <string name="shift_updated_replanned">Your shift was updated.</string>
+    <string name="shift_updated_action_reload">Reload</string>
 
     <!-- Create shift -->
     <string name="create_shift_title">New shift</string>
@@ -205,6 +211,7 @@
     <string name="create_shift_label_location_name">Name (e.g. Home)</string>
     <string name="create_shift_label_search_address">Search address</string>
     <string name="create_shift_use_saved_location">Use a saved location instead</string>
+    <string name="warehouse_personal_org_limit_notice">Personal accounts are limited to one warehouse.</string>
     <string name="create_shift_label_address">Address</string>
     <string name="address_autocomplete_no_results">No address found</string>
     <string name="address_pick_on_map">Pick on map</string>
@@ -306,6 +313,22 @@
     <string name="package_error_choose_arrival">Choose a scheduled arrival date and time.</string>
     <string name="package_error_save_warehouse_failed">Couldn't save the warehouse.</string>
     <string name="package_error_submit_failed">Couldn't create the package.</string>
+
+    <!-- Add package: what the backend did with it (POST /api/v1/packages assignment outcome) -->
+    <string name="package_outcome_title">Package created</string>
+    <string name="package_outcome_assigned">Added to a shift today, stop %1$s.</string>
+    <string name="package_outcome_assigned_eta">Added to a shift today, stop %1$s, arriving about %2$s.</string>
+    <string name="package_outcome_new_shift">A new shift was opened for it, stop %1$s.</string>
+    <string name="package_outcome_new_shift_eta">A new shift was opened for it, stop %1$s, arriving about %2$s.</string>
+    <string name="package_outcome_deferred">Queued. It isn\'t on a shift yet.</string>
+    <string name="package_outcome_skipped">Not added to a shift.</string>
+    <string name="package_outcome_reason_no_capacity">Today\'s shifts are full.</string>
+    <string name="package_outcome_reason_no_driver">No driver and vehicle are free today.</string>
+    <string name="package_outcome_reason_allowance">This month\'s shift allowance is used up.</string>
+    <string name="package_outcome_reason_no_geocode">The delivery address couldn\'t be placed on the map.</string>
+    <string name="package_outcome_reason_auto_assign">You\'ll add it to a shift yourself.</string>
+    <string name="package_outcome_reason_deadline">No shift today can reach it by its deadline.</string>
+    <string name="package_outcome_evicted">%1$s other package(s) moved to another shift to make room.</string>
 
     <!-- Vehicle overview -->
     <string name="vehicle_overview_title">Vehicles</string>

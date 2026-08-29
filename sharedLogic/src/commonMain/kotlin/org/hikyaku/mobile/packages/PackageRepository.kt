@@ -1,18 +1,33 @@
 package org.hikyaku.mobile.packages
 
 import io.github.jan.supabase.SupabaseClient
+import io.github.jan.supabase.auth.auth
 import io.github.jan.supabase.postgrest.postgrest
 import io.github.jan.supabase.postgrest.query.Columns
 import io.github.jan.supabase.postgrest.query.Order
 import io.github.jan.supabase.storage.StorageItem
 import io.github.jan.supabase.storage.authenticatedStorageItem
 import io.github.jan.supabase.storage.storage
+import io.ktor.client.HttpClient
+import io.ktor.client.call.body
+import io.ktor.client.request.header
+import io.ktor.client.request.post
+import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.ContentType
+import io.ktor.http.contentType
+import io.ktor.http.isSuccess
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import org.hikyaku.mobile.api.generated.models.CreatePackageResultDto
 import org.hikyaku.mobile.auth.SupabaseClientProvider
 import org.hikyaku.mobile.geocode.model.AddressSuggestion
+import org.hikyaku.mobile.net.ApiConfigProvider
+import org.hikyaku.mobile.net.ApiEndpoints
+import org.hikyaku.mobile.net.ApiHeaders
+import org.hikyaku.mobile.net.appHttpClient
 import org.hikyaku.mobile.packages.model.PackageDeliveryWindow
 import org.hikyaku.mobile.packages.model.PackageDetail
 import org.hikyaku.mobile.packages.model.PackageDimensions
@@ -20,6 +35,7 @@ import org.hikyaku.mobile.packages.model.PackageDraft
 import org.hikyaku.mobile.packages.model.PackageParty
 import org.hikyaku.mobile.packages.model.PackageSummary
 import org.hikyaku.mobile.packages.model.PackageTimelineEntry
+import org.hikyaku.mobile.shift.create.PackageConflictException
 import org.hikyaku.mobile.shift.create.model.CustomerSuggestion
 import org.hikyaku.mobile.shift.create.model.ShiftCustomerInput
 import org.hikyaku.mobile.shift.create.model.WarehouseOption
@@ -35,9 +51,16 @@ import org.maplibre.spatialk.geojson.Point
  * optional photos uploaded to the private `packages` storage bucket under `{packageId}/...` and
  * recorded in `package_proof_of_delivery`. `packages.tracking_number` is left unset on insert — a
  * `BEFORE INSERT` trigger (`packages_set_tracking_number`) generates it server-side.
+ *
+ * Reads still go through PostgREST; [createPackage] goes through `POST /api/v1/packages` so the
+ * write is one transaction and the package can be assigned to a shift on the spot. The API call is
+ * authenticated with the caller's Supabase access token and scoped with `X-Organisation-Slug`,
+ * matching [org.hikyaku.mobile.shift.create.CreateShiftRepository].
  */
 class PackageRepository(
     private val client: SupabaseClient = SupabaseClientProvider.client,
+    private val httpClient: HttpClient = appHttpClient,
+    private val apiUrl: () -> String = { ApiConfigProvider.requireUrl },
 ) {
     /**
      * One page of [orgId]'s packages, newest first. [from]/[to] are inclusive row offsets
@@ -167,57 +190,53 @@ class PackageRepository(
     }
 
     /**
-     * Persists [draft]: resolves (or creates) the sender and receiver customers, inserts the
-     * `packages` row, its dimensions and delivery window, then uploads any [PackageDraft.images] to
-     * the `packages` bucket. Returns the new package's id.
+     * Persists [draft] through `POST /api/v1/packages`: the sender and receiver customers are
+     * resolved (or created) here first, then one call writes the `packages` row, its dimensions,
+     * its delivery window and the opening `PENDING` timeline entry in a single server-side
+     * transaction — and, unless [PackageDraft.autoAssign] is false, assigns the package to a shift
+     * before returning. That replaces five non-atomic PostgREST inserts that could (and did) leave a
+     * half-written package behind on a mid-sequence failure.
      *
-     * Also stamps an initial `package_timeline` row at the PENDING status — nothing else does this
-     * (there's no longer a DB trigger for it, see `drop_stale_package_status_trigger`), and the
-     * warehouse-wide optimiser's candidate query joins `package_timeline` with an inner join, so a
-     * package with no timeline row is invisible to it forever.
+     * Returns the whole [CreatePackageResultDto], not just an id: `assignment.outcome` is what the
+     * caller renders ("stop 7, ETA 14:20" / "queued"), and it is only ever available here. The call
+     * answers 201 even when assignment failed — a package is never lost because it couldn't be
+     * routed — so a non-success status is a real error, and 409 specifically means a
+     * tracking-number collision with a different payload.
+     *
+     * Photos still go straight to Supabase Storage rather than through the API: they already flow
+     * under working RLS, the API has no multipart parser, and proxying the bytes through it would
+     * add latency for nothing. The upload just moves *after* the create, keyed on the returned
+     * package id, so the row the POD insert references already exists.
      */
-    suspend fun createPackage(draft: PackageDraft): Result<String> = runCatching {
+    suspend fun createPackage(draft: PackageDraft): Result<CreatePackageResultDto> = runCatching {
         val fromCustomerId = ensureCustomer(draft.organisationId, draft.sender)
         val toCustomerId = ensureCustomer(draft.organisationId, draft.receiver)
 
-        val packageId = newId()
-        client.postgrest.from(SupabaseTables.PACKAGES).insert(
-            PackageInsert(
-                id = packageId,
-                fromCustomer = fromCustomerId,
-                toCustomer = toCustomerId,
-                warehouseId = draft.warehouseId,
-                deliveryNotes = draft.deliveryNotes?.takeIf { it.isNotBlank() },
-                organisationId = draft.organisationId,
-            ),
-        )
-        client.postgrest.from(SupabaseTables.PACKAGE_DIMENSIONS).insert(
-            PackageDimensionsInsert(
-                packageId = packageId,
-                weightKg = draft.weightKg,
-                lengthCm = draft.lengthCm,
-                widthCm = draft.widthCm,
-                heightCm = draft.heightCm,
-            ),
-        )
-        client.postgrest.from(SupabaseTables.PACKAGE_DELIVERY_WINDOW).insert(
-            PackageDeliveryWindowInsert(packageId = packageId, scheduledArrival = draft.scheduledArrival),
-        )
-        client.postgrest.from(SupabaseTables.PACKAGE_TIMELINE).insert(
-            PackageTimelineInsert(packageId = packageId, packageStatus = resolvePendingStatusId()),
-        )
-        draft.images.forEachIndexed { index, bytes -> uploadImage(packageId, index, bytes) }
-        packageId
+        val response = httpClient.post(ApiEndpoints.packages(apiUrl())) {
+            header(ApiHeaders.AUTHORIZATION, ApiHeaders.bearer(accessToken()))
+            header(ApiHeaders.ORGANISATION_SLUG, draft.orgSlug)
+            contentType(ContentType.Application.Json)
+            setBody(
+                draft.toCreatePackageDto(
+                    // Minted client-side, which is what makes a retried create replay the same
+                    // package instead of writing a second one.
+                    id = newId(),
+                    fromCustomerId = fromCustomerId,
+                    toCustomerId = toCustomerId,
+                ),
+            )
+        }
+        if (!response.status.isSuccess()) {
+            val body = response.bodyAsText().take(300)
+            if (response.status.value == 409) throw PackageConflictException(body)
+            error("Couldn't create the package (${response.status.value}): $body")
+        }
+        val result = response.body<CreatePackageResultDto>()
+        // Use the id the server reports, not the one sent: an idempotent replay answers with the
+        // original package, and the photos belong under that one.
+        draft.images.forEachIndexed { index, bytes -> uploadImage(result.`package`.id, index, bytes) }
+        result
     }
-
-    /** The `package_status.id` whose `enums` is `PENDING` — every new package starts at this status. */
-    private suspend fun resolvePendingStatusId(): Long =
-        client.postgrest.from(SupabaseTables.PACKAGE_STATUS)
-            .select(Columns.raw("id")) {
-                filter { eq("enums", "PENDING") }
-            }
-            .decodeSingle<PackageStatusIdRow>()
-            .id
 
     private suspend fun uploadImage(packageId: String, index: Int, bytes: ByteArray) {
         val path = "$packageId/photo_$index.jpg"
@@ -267,6 +286,9 @@ class PackageRepository(
         return customerId
     }
 
+    private fun accessToken(): String =
+        client.auth.currentSessionOrNull()?.accessToken ?: error("Session expired. Please sign in again.")
+
     private companion object {
         // pod_type lookup id for "Photo" (see the pod_type table).
         const val POD_TYPE_PHOTO = 2
@@ -302,9 +324,6 @@ class PackageRepository(
 
 @Serializable
 private data class IdRow(val id: String)
-
-@Serializable
-private data class PackageStatusIdRow(val id: Long)
 
 @Serializable
 private data class PackageDetailRow(
@@ -483,36 +502,9 @@ private data class CustomerInsert(
     @SerialName("organisation_id") val organisationId: String,
 )
 
-@Serializable
-private data class PackageInsert(
-    val id: String,
-    @SerialName("from_customer") val fromCustomer: String,
-    @SerialName("to_customer") val toCustomer: String,
-    @SerialName("warehouse_id") val warehouseId: String,
-    @SerialName("delivery_notes") val deliveryNotes: String?,
-    @SerialName("organisation_id") val organisationId: String,
-)
-
-@Serializable
-private data class PackageDimensionsInsert(
-    @SerialName("package_id") val packageId: String,
-    @SerialName("weight_kg") val weightKg: Double,
-    @SerialName("length_cm") val lengthCm: Double,
-    @SerialName("width_cm") val widthCm: Double,
-    @SerialName("height_cm") val heightCm: Double,
-)
-
-@Serializable
-private data class PackageDeliveryWindowInsert(
-    @SerialName("package_id") val packageId: String,
-    @SerialName("scheduled_arrival") val scheduledArrival: String,
-)
-
-@Serializable
-private data class PackageTimelineInsert(
-    @SerialName("package_id") val packageId: String,
-    @SerialName("package_status") val packageStatus: Long,
-)
+// The `packages` / `package_dimensions` / `package_delivery_window` / `package_timeline` inserts
+// that used to live here are gone: `POST /api/v1/packages` writes all four in one transaction, and
+// its request body is the generated CreatePackageDto (see PackageDraftMapping.kt).
 
 @Serializable
 private data class PodInsert(

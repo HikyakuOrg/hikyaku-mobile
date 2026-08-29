@@ -95,6 +95,13 @@ val hikyakuApiAppModels = listOf(
     "AdhocOptimisationDto", "AdhocOptimisationResultDto",
     "RunOptimisationDto", "RunOptimisationResultDto", "LatestOptimisationRunDto", "SetOffOverrideDto",
     "PendingInvitationDto", "InvitationOrganisationDto", "AcceptInvitationResultDto",
+    // Instant package assignment: POST /packages, POST /packages/bulk, POST /shifts,
+    // GET /shifts/{id}/version.
+    "CreatePackageDto", "PackageDimensionsDto", "PackageDto", "CreatePackageResultDto",
+    "AssignmentOutcomeDto", "AssignedShiftDto",
+    "BulkCreatePackagesDto", "BulkCreatePackagesResultDto", "BulkCreatePackageResultDto",
+    "CreateShiftDto", "ShiftDto", "ShiftVersionDto", "ShiftPlanDto", "ShiftPackageOutcomeDto",
+    "AddPackagesToShiftDto",
 )
 
 val refreshHikyakuApiSpec by tasks.registering {
