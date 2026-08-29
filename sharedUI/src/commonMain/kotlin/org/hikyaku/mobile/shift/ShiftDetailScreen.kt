@@ -459,7 +459,9 @@ private fun ShiftDetailScreenContent(
             state.isLoadingRoutes -> CenteredSpinner(Modifier.fillMaxSize().padding(padding))
 
             state.routesError != null -> RetryCard(
-                message = state.routesError!!,
+                // `state` is read through a `by` delegate, so each access is a fresh getValue() call
+                // and the `!= null` guard above can't smart-cast. The guard makes this never blank.
+                message = state.routesError.orEmpty(),
                 onRetry = onLoadRoutes,
                 modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
             )
@@ -540,7 +542,7 @@ private fun ShiftDetailScreenContent(
                 } else if (state.routeError != null) {
                     item {
                         RetryCard(
-                            message = state.routeError!!,
+                            message = state.routeError.orEmpty(),
                             onRetry = { state.selectedRouteId?.let(onSelectRoute) },
                             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                         )
