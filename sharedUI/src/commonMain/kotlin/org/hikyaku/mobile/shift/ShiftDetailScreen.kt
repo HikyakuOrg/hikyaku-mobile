@@ -57,6 +57,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarDuration
@@ -78,6 +79,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
@@ -107,6 +109,10 @@ import org.hikyaku.mobile.geocode.model.RoutePoi
 import org.hikyaku.mobile.geocode.model.RoutePoiKind
 import org.hikyaku.mobile.map.mapLayersSupported
 import org.hikyaku.mobile.share.rememberShareText
+import org.hikyaku.mobile.shift.pod.PodDraftState
+import org.hikyaku.mobile.shift.pod.PodProofreadState
+import org.hikyaku.mobile.shift.pod.rememberPodDescriber
+import org.hikyaku.mobile.shift.pod.rememberPodProofreader
 import org.hikyaku.mobile.shift.scan.ScanPackagesOverlay
 import org.hikyaku.mobile.theme.HikyakuTheme
 import org.hikyaku.mobile.toast.LocalToastHostState
@@ -156,6 +162,8 @@ import hikyaku.sharedui.generated.resources.shift_no_routes
 import hikyaku.sharedui.generated.resources.shift_packages_count
 import hikyaku.sharedui.generated.resources.shift_permission_required_message
 import hikyaku.sharedui.generated.resources.shift_photo_added
+import hikyaku.sharedui.generated.resources.shift_pod_description_label
+import hikyaku.sharedui.generated.resources.shift_pod_description_placeholder
 import hikyaku.sharedui.generated.resources.shift_route_label
 import hikyaku.sharedui.generated.resources.shift_scan_gate_banner
 import hikyaku.sharedui.generated.resources.shift_scan_packages_button
@@ -331,7 +339,7 @@ private fun ShiftDetailScreenContent(
     onClearEditError: () -> Unit,
     onClearActionError: () -> Unit,
     onRemoveStop: (RouteStep) -> Unit,
-    onMarkDelivered: (packageId: String, photoBytes: ByteArray?) -> Unit,
+    onMarkDelivered: (packageId: String, photoBytes: ByteArray?, description: String?) -> Unit,
     onOpenAddStop: () -> Unit,
     onCloseAddStop: () -> Unit,
     onSelectAddStopPackage: (String) -> Unit,
@@ -356,11 +364,49 @@ private fun ShiftDetailScreenContent(
     // Whether the full-screen (interactive) map is shown.
     var showFullMap by remember { mutableStateOf(false) }
 
-    // Photo captured for the stop currently in transit; cleared when the stop changes.
+    // Photo captured for the stop currently in transit, and its AI-drafted/courier-edited
+    // caption; both cleared when the stop changes.
     var capturedPhoto by remember { mutableStateOf<ByteArray?>(null) }
-    LaunchedEffect(state.inTransitPackageId) { capturedPhoto = null }
+    var descriptionText by remember { mutableStateOf("") }
+    var descriptionEditedByUser by remember { mutableStateOf(false) }
 
-    val capturePhoto = rememberPhotoCapture { bytes -> if (bytes != null) capturedPhoto = bytes }
+    val podDescriber = rememberPodDescriber()
+    val podProofreader = rememberPodProofreader()
+
+    LaunchedEffect(state.inTransitPackageId) {
+        capturedPhoto = null
+        descriptionText = ""
+        descriptionEditedByUser = false
+        podDescriber.resetDraft()
+    }
+
+    // Warm both on-device models up as soon as the shift starts, well ahead of the first photo
+    // capture, so they're more likely ready by the time the courier reaches a stop. Both prepare()
+    // calls are idempotent and self-dispatch, so this never blocks shift start.
+    LaunchedEffect(state.shiftStarted) {
+        if (state.shiftStarted) {
+            podDescriber.prepare()
+            podProofreader.prepare()
+        }
+    }
+
+    // Pre-fill the caption from the AI draft exactly once — never clobber an edit the courier has
+    // already started making, even if a late-arriving draft resolves after they've begun typing.
+    LaunchedEffect(podDescriber.state) {
+        val draft = podDescriber.state
+        if (draft is PodDraftState.Ready && !descriptionEditedByUser) {
+            descriptionText = draft.text
+        }
+    }
+
+    val capturePhoto = rememberPhotoCapture { bytes ->
+        if (bytes != null) {
+            capturedPhoto = bytes
+            descriptionText = ""
+            descriptionEditedByUser = false
+            podDescriber.describe(bytes)
+        }
+    }
     // Background tracking is required, so a shift can only start once "Allow all the time" location
     // (and notifications) are granted; otherwise we surface a banner pointing the user to settings.
     var permissionDenied by remember { mutableStateOf(false) }
@@ -582,7 +628,17 @@ private fun ShiftDetailScreenContent(
                                 isCurrent = step.id == state.currentJobStepId,
                                 showNavigate = state.shiftStarted || state.allPackagesScanned,
                                 actionEnabled = !state.isActionInProgress,
-                                hasPhoto = capturedPhoto != null,
+                                capturedPhoto = capturedPhoto,
+                                descriptionText = descriptionText,
+                                descriptionBusy = podDescriber.state is PodDraftState.Analyzing ||
+                                    podProofreader.state is PodProofreadState.Checking,
+                                onDescriptionChange = { descriptionText = it; descriptionEditedByUser = true },
+                                onDescriptionBlur = {
+                                    podProofreader.proofread(descriptionText) { corrected ->
+                                        descriptionText = corrected
+                                        descriptionEditedByUser = true
+                                    }
+                                },
                                 editMode = state.editMode,
                                 locked = state.isStopLocked(step),
                                 removeEnabled = !state.isEditing,
@@ -594,8 +650,11 @@ private fun ShiftDetailScreenContent(
                                 },
                                 onMarkDelivered = {
                                     if (packageId != null) {
-                                        onMarkDelivered(packageId, capturedPhoto)
+                                        onMarkDelivered(packageId, capturedPhoto, descriptionText.trim().takeIf { it.isNotBlank() })
                                         capturedPhoto = null
+                                        descriptionText = ""
+                                        descriptionEditedByUser = false
+                                        podDescriber.resetDraft()
                                     }
                                 },
                                 modifier = Modifier.padding(horizontal = 16.dp),
@@ -732,7 +791,7 @@ private fun ShiftDetailScreenPreview() {
             onClearEditError = {},
             onClearActionError = {},
             onRemoveStop = {},
-            onMarkDelivered = { _, _ -> },
+            onMarkDelivered = { _, _, _ -> },
             onOpenAddStop = {},
             onCloseAddStop = {},
             onSelectAddStopPackage = {},
@@ -1699,7 +1758,11 @@ private fun PackageCard(
     isCurrent: Boolean,
     showNavigate: Boolean,
     actionEnabled: Boolean,
-    hasPhoto: Boolean,
+    capturedPhoto: ByteArray?,
+    descriptionText: String,
+    descriptionBusy: Boolean,
+    onDescriptionChange: (String) -> Unit,
+    onDescriptionBlur: () -> Unit,
     editMode: Boolean,
     locked: Boolean,
     removeEnabled: Boolean,
@@ -1871,7 +1934,7 @@ private fun PackageCard(
                 ) {
                     OutlinedButton(onClick = onAddPhoto, enabled = actionEnabled) {
                         Text(
-                            if (hasPhoto) {
+                            if (capturedPhoto != null) {
                                 stringResource(Res.string.shift_photo_added)
                             } else {
                                 stringResource(Res.string.shift_add_photo)
@@ -1883,6 +1946,39 @@ private fun PackageCard(
                         enabled = actionEnabled,
                         modifier = Modifier.weight(1f),
                     ) { Text(stringResource(Res.string.shift_mark_delivered)) }
+                }
+                if (capturedPhoto != null) {
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        AsyncImage(
+                            model = capturedPhoto,
+                            contentDescription = stringResource(Res.string.cd_package_photo),
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp)),
+                        )
+                        OutlinedTextField(
+                            value = descriptionText,
+                            onValueChange = onDescriptionChange,
+                            label = { Text(stringResource(Res.string.shift_pod_description_label)) },
+                            placeholder = { Text(stringResource(Res.string.shift_pod_description_placeholder)) },
+                            trailingIcon = if (descriptionBusy) {
+                                {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(20.dp),
+                                        strokeWidth = 2.dp,
+                                    )
+                                }
+                            } else {
+                                null
+                            },
+                            enabled = actionEnabled,
+                            minLines = 2,
+                            maxLines = 4,
+                            modifier = Modifier
+                                .weight(1f)
+                                .onFocusChanged { if (!it.isFocused) onDescriptionBlur() },
+                        )
+                    }
                 }
             }
         }

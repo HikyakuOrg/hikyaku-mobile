@@ -161,6 +161,8 @@
     <string name="shift_photo_added">Photo added ✓</string>
     <string name="shift_add_photo">Add photo</string>
     <string name="shift_mark_delivered">Mark delivered</string>
+    <string name="shift_pod_description_label">Photo description</string>
+    <string name="shift_pod_description_placeholder">Describe the delivery (optional)</string>
     <string name="shift_navigate">Navigate</string>
     <string name="shift_call_recipient">Call recipient</string>
     <string name="poi_fuel_station">Fuel station</string>

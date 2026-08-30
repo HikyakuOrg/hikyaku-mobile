@@ -41,6 +41,12 @@ kotlin {
             implementation(libs.androidx.credentials)
             implementation(libs.androidx.credentials.playServicesAuth)
             implementation(libs.googleid)
+            // On-device GenAI (Gemini Nano via AICore); the actuals for `expect fun
+            // rememberPodDescriber`/`rememberPodProofreader`. Both APIs return Guava
+            // ListenableFuture (not a Play Services Task), hence coroutines-guava for .await().
+            implementation(libs.mlkit.genai.imageDescription)
+            implementation(libs.mlkit.genai.proofreading)
+            implementation(libs.kotlinx.coroutinesGuava)
         }
         jvmMain.dependencies {
             // Phone-number validation/formatting; the actual for `expect object PhoneNumbers`.

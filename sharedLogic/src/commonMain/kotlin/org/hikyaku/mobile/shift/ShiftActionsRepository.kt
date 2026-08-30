@@ -77,14 +77,19 @@ class ShiftActionsRepository(
     /**
      * Uploads a proof-of-delivery photo to `packages/{packageId}/pod.jpg` (the same private
      * bucket the detail screen reads, where RLS lets the assigned driver write) and records a
-     * `package_proof_of_delivery` row pointing at it. Overwrites any existing driver POD photo
-     * for the package.
+     * `package_proof_of_delivery` row pointing at it, along with an optional caption (either the
+     * on-device AI-drafted description or the courier's own edit of it). Overwrites any existing
+     * driver POD photo for the package.
      */
-    suspend fun uploadProofPhoto(packageId: String, bytes: ByteArray): Result<Unit> = runCatching {
+    suspend fun uploadProofPhoto(
+        packageId: String,
+        bytes: ByteArray,
+        description: String? = null,
+    ): Result<Unit> = runCatching {
         val path = "$packageId/pod.jpg"
         client.storage.from(SupabaseBuckets.PACKAGES).upload(path, bytes) { upsert = true }
         client.postgrest.from(SupabaseTables.PACKAGE_PROOF_OF_DELIVERY)
-            .insert(PodInsert(packageId, POD_TYPE_PHOTO, path))
+            .insert(PodInsert(packageId, POD_TYPE_PHOTO, path, description?.trim()?.takeIf { it.isNotBlank() }))
         Unit
     }
 
@@ -123,4 +128,5 @@ private data class PodInsert(
     @SerialName("package_id") val packageId: String,
     @SerialName("pod_type_id") val podTypeId: Int,
     @SerialName("file_url") val fileUrl: String,
+    val description: String? = null,
 )

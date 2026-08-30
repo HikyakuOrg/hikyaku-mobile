@@ -835,10 +835,11 @@ class ShiftDetailViewModel(
     }
 
     /**
-     * Marks [packageId] delivered (optionally attaching [photoBytes] as proof) and rolls the next
-     * undelivered stop to in transit. When no stop remains, deliveries are complete.
+     * Marks [packageId] delivered (optionally attaching [photoBytes] as proof, with [description]
+     * as its caption) and rolls the next undelivered stop to in transit. When no stop remains,
+     * deliveries are complete.
      */
-    fun markDelivered(packageId: String, photoBytes: ByteArray? = null) {
+    fun markDelivered(packageId: String, photoBytes: ByteArray? = null, description: String? = null) {
         val current = _state.value
         if (current.isActionInProgress) return
         _state.value = current.copy(isActionInProgress = true, actionError = null)
@@ -846,7 +847,7 @@ class ShiftDetailViewModel(
         viewModelScope.launch {
             if (photoBytes != null) {
                 // A failed photo upload shouldn't block the delivery; surface it but continue.
-                actionsRepository.uploadProofPhoto(packageId, photoBytes)
+                actionsRepository.uploadProofPhoto(packageId, photoBytes, description)
                     .onFailure { _state.value = _state.value.copy(actionError = it.message ?: getString(Res.string.shift_error_photo_upload_failed)) }
             }
             actionsRepository.markDelivered(packageId)
