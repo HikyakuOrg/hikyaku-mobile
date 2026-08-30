@@ -63,6 +63,8 @@ kotlin {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.play.services.location)
             implementation(libs.androidx.startup.runtime)
+            implementation(libs.androidx.work.runtime)
+            implementation(libs.androidx.core.ktx)
         }
         jvmMain.dependencies {
             implementation(libs.ktor.client.cio)

@@ -847,7 +847,7 @@ class ShiftDetailViewModel(
         viewModelScope.launch {
             if (photoBytes != null) {
                 // A failed photo upload shouldn't block the delivery; surface it but continue.
-                actionsRepository.uploadProofPhoto(packageId, photoBytes, description)
+                actionsRepository.uploadProofPhotoOrQueue(packageId, photoBytes, description)
                     .onFailure { _state.value = _state.value.copy(actionError = it.message ?: getString(Res.string.shift_error_photo_upload_failed)) }
             }
             actionsRepository.markDelivered(packageId)

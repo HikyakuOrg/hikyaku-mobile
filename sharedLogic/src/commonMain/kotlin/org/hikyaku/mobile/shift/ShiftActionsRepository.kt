@@ -8,6 +8,7 @@ import io.github.jan.supabase.storage.storage
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import org.hikyaku.mobile.auth.SupabaseClientProvider
+import org.hikyaku.mobile.shift.pod.PodUploadQueue
 import org.hikyaku.mobile.shift.session.ShiftStatus
 import org.hikyaku.mobile.supabase.SupabaseBuckets
 import org.hikyaku.mobile.supabase.SupabaseTables
@@ -29,6 +30,7 @@ import org.hikyaku.mobile.supabase.SupabaseTables
 class ShiftActionsRepository(
     private val client: SupabaseClient = SupabaseClientProvider.client,
     private val statusCatalog: PackageStatusCatalog = PackageStatusCatalog(client),
+    private val uploadQueue: PodUploadQueue = PodUploadQueue(),
 ) {
     /** Marks [packageId] as in transit (the stop currently being driven to). */
     suspend fun markInTransit(packageId: String): Result<Unit> = setStatus(packageId, ShiftStatus.IN_TRANSIT)
@@ -91,6 +93,26 @@ class ShiftActionsRepository(
         client.postgrest.from(SupabaseTables.PACKAGE_PROOF_OF_DELIVERY)
             .insert(PodInsert(packageId, POD_TYPE_PHOTO, path, description?.trim()?.takeIf { it.isNotBlank() }))
         Unit
+    }
+
+    /**
+     * Uploads the POD photo inline, falling back to a durably-queued background retry
+     * ([PodUploadQueue]) if that fails — e.g. no signal at the delivery point. Only reports
+     * failure if the photo couldn't even be queued (unsupported platform, disk error), in which
+     * case the original inline failure is what's surfaced, since the queue failure itself isn't
+     * actionable by the caller.
+     */
+    suspend fun uploadProofPhotoOrQueue(
+        packageId: String,
+        bytes: ByteArray,
+        description: String? = null,
+    ): Result<Unit> {
+        val result = uploadProofPhoto(packageId, bytes, description)
+        if (result.isSuccess) return result
+        return uploadQueue.enqueue(packageId, bytes, description).fold(
+            onSuccess = { Result.success(Unit) },
+            onFailure = { result },
+        )
     }
 
     private companion object {
