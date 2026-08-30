@@ -10,4 +10,12 @@ import org.hikyaku.mobile.shift.location.model.DeviceLocation
  */
 expect class LocationProvider() {
     fun locationUpdates(): Flow<DeviceLocation>
+
+    /**
+     * A single best-effort location fix (e.g. to stamp the courier's position onto a POD photo's
+     * EXIF data at capture time), rather than committing to a continuous stream. Returns null if
+     * a fix can't be obtained in time (permission missing, no signal, timeout) — callers should
+     * treat the tagging it enables as optional, never block on it.
+     */
+    suspend fun currentLocation(): DeviceLocation?
 }

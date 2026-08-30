@@ -10,4 +10,6 @@ import org.hikyaku.mobile.shift.location.model.DeviceLocation
  */
 actual class LocationProvider {
     actual fun locationUpdates(): Flow<DeviceLocation> = emptyFlow()
+
+    actual suspend fun currentLocation(): DeviceLocation? = null
 }

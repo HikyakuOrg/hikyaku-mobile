@@ -36,6 +36,9 @@ kotlin {
             implementation(libs.libphonenumber)
             // Shipping-label printing; the actual for `expect fun rememberPrintShippingLabel`.
             implementation(libs.androidx.print)
+            // Tags the POD photo's JPEG with the courier's GPS position; used by
+            // `rememberPhotoCapture`.
+            implementation(libs.androidx.exifinterface)
             implementation(libs.zxing.core)
             // Google native sign-in; the actual for `expect fun rememberGoogleIdTokenLauncher`.
             implementation(libs.androidx.credentials)

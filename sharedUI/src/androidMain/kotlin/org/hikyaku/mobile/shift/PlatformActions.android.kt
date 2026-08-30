@@ -12,13 +12,18 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
+import androidx.exifinterface.media.ExifInterface
 import java.io.File
+import kotlinx.coroutines.launch
+import org.hikyaku.mobile.shift.location.model.DeviceLocation
 import org.maplibre.compose.location.LocationProvider
 import org.maplibre.compose.location.rememberDefaultLocationProvider
+import org.hikyaku.mobile.shift.location.LocationProvider as DeviceLocationProvider
 
 @Composable
 actual fun rememberShiftPermissions(onResult: (granted: Boolean) -> Unit): () -> Unit {
@@ -158,21 +163,47 @@ private fun needsActivityRecognition(context: Context): Boolean =
 @Composable
 actual fun rememberPhotoCapture(onResult: (ByteArray?) -> Unit): () -> Unit {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val locationProvider = remember { DeviceLocationProvider() }
     // The temp file the camera writes the full-resolution photo into.
     val pendingFile = remember { mutableStateOf<File?>(null) }
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.TakePicture(),
     ) { success ->
         val file = pendingFile.value
-        onResult(if (success && file != null) file.readBytes() else null)
-        file?.delete()
         pendingFile.value = null
+        if (success && file != null) {
+            // Stamping GPS needs a location fix, which is async — the courier's photo is taken
+            // by an external camera app that (unlike this app) was never granted location
+            // permission, so its own JPEG never carries GPS EXIF tags on its own.
+            scope.launch {
+                locationProvider.currentLocation()?.let { location -> tagGpsLocation(file, location) }
+                onResult(file.readBytes())
+                file.delete()
+            }
+        } else {
+            file?.delete()
+            onResult(null)
+        }
     }
     return {
         val file = File.createTempFile("pod_", ".jpg", context.cacheDir)
         pendingFile.value = file
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         launcher.launch(uri)
+    }
+}
+
+/**
+ * Best-effort: embeds [location] as the JPEG's GPS EXIF tags. Silently no-ops on failure (e.g. a
+ * malformed file) — a POD photo without GPS is still a valid photo.
+ */
+private fun tagGpsLocation(file: File, location: DeviceLocation) {
+    runCatching {
+        ExifInterface(file.absolutePath).apply {
+            setLatLong(location.lat, location.lng)
+            saveAttributes()
+        }
     }
 }
 

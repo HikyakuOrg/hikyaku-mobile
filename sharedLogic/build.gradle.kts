@@ -62,6 +62,9 @@ kotlin {
         androidMain.dependencies {
             implementation(libs.ktor.client.okhttp)
             implementation(libs.play.services.location)
+            // Bridges FusedLocationProviderClient's Task<Location> to a suspend call in
+            // LocationProvider.currentLocation().
+            implementation(libs.kotlinx.coroutinesPlayServices)
             implementation(libs.androidx.startup.runtime)
             implementation(libs.androidx.work.runtime)
             implementation(libs.androidx.core.ktx)
