@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -60,12 +61,15 @@ import hikyaku.sharedui.generated.resources.cd_vehicle_photo
 import hikyaku.sharedui.generated.resources.vehicle_action_choose_photos
 import hikyaku.sharedui.generated.resources.vehicle_action_take_photo
 import hikyaku.sharedui.generated.resources.vehicle_add_title
+import hikyaku.sharedui.generated.resources.vehicle_add_warehouse_cta
 import hikyaku.sharedui.generated.resources.vehicle_label_gross_limits
 import hikyaku.sharedui.generated.resources.vehicle_label_make
 import hikyaku.sharedui.generated.resources.vehicle_label_model
 import hikyaku.sharedui.generated.resources.vehicle_label_plate
 import hikyaku.sharedui.generated.resources.vehicle_label_vin
 import hikyaku.sharedui.generated.resources.vehicle_label_year
+import hikyaku.sharedui.generated.resources.vehicle_no_warehouses_body
+import hikyaku.sharedui.generated.resources.vehicle_no_warehouses_title
 import hikyaku.sharedui.generated.resources.vehicle_section_photos
 import hikyaku.sharedui.generated.resources.vehicle_section_type
 import hikyaku.sharedui.generated.resources.vehicle_section_warehouse
@@ -90,6 +94,7 @@ fun AddVehicleScreen(
     viewModel: AddVehicleViewModel,
     onDone: () -> Unit,
     onCancel: () -> Unit,
+    onAddWarehouse: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsState()
@@ -100,6 +105,7 @@ fun AddVehicleScreen(
         state = state,
         onSubmit = viewModel::submit,
         onCancel = onCancel,
+        onAddWarehouse = onAddWarehouse,
         onSetModel = viewModel::setModel,
         onSetMake = viewModel::setMake,
         onSetPlate = viewModel::setPlate,
@@ -120,6 +126,7 @@ private fun AddVehicleScreenContent(
     state: AddVehicleUiState,
     onSubmit: () -> Unit,
     onCancel: () -> Unit,
+    onAddWarehouse: () -> Unit,
     onSetModel: (String) -> Unit,
     onSetMake: (String) -> Unit,
     onSetPlate: (String) -> Unit,
@@ -219,7 +226,11 @@ private fun AddVehicleScreenContent(
                 SectionLabel(stringResource(Res.string.vehicle_section_type))
                 VehicleTypeDropdown(state, onSelectVehicleType)
                 SectionLabel(stringResource(Res.string.vehicle_section_warehouse))
-                WarehouseOptions(state, onSelectWarehouse)
+                if (state.warehouses.isEmpty()) {
+                    NoWarehousesCard(onAddWarehouse = onAddWarehouse)
+                } else {
+                    WarehouseOptions(state, onSelectWarehouse)
+                }
                 SectionLabel(stringResource(Res.string.vehicle_section_photos))
                 ImagesSection(state, onAddImages, onRemoveImage)
                 Spacer(Modifier.height(16.dp))
@@ -253,6 +264,7 @@ private fun AddVehicleScreenPreview() {
             ),
             onSubmit = {},
             onCancel = {},
+            onAddWarehouse = {},
             onSetModel = {},
             onSetMake = {},
             onSetPlate = {},
@@ -291,6 +303,26 @@ private fun VehicleTypeDropdown(state: AddVehicleUiState, onSelectVehicleType: (
                     onClick = { onSelectVehicleType(type.id); expanded = false },
                 )
             }
+        }
+    }
+}
+
+/**
+ * Shown in place of [WarehouseOptions] when the org has no warehouses: a vehicle can't be created
+ * without a home warehouse, so this explains why and sends the user straight to the add-warehouse
+ * screen rather than letting them discover the problem only after submitting.
+ */
+@Composable
+private fun NoWarehousesCard(onAddWarehouse: () -> Unit) {
+    ElevatedCard(Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(Res.string.vehicle_no_warehouses_title), style = MaterialTheme.typography.titleSmall)
+            Text(
+                stringResource(Res.string.vehicle_no_warehouses_body),
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Button(onClick = onAddWarehouse) { Text(stringResource(Res.string.vehicle_add_warehouse_cta)) }
         }
     }
 }

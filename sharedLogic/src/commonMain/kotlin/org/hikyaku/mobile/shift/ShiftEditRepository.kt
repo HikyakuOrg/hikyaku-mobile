@@ -58,10 +58,9 @@ class ShiftEditRepository(
 
     /**
      * The org's packages with no shift yet (`optimisation_id IS NULL`), offered as stops that can be
-     * added to an in-progress or upcoming shift. Ordered newest first, same "available" definition
-     * [org.hikyaku.mobile.shift.create.CreateShiftRepository.fetchAvailablePackages] uses for the
-     * create-shift wizard. Packages without a usable geocoded receiver address are excluded, since
-     * their coordinates are needed to place the new route step.
+     * added to an in-progress or upcoming shift. Ordered newest first. Packages without a usable
+     * geocoded receiver address are excluded, since their coordinates are needed to place the new
+     * route step.
      */
     suspend fun fetchAddablePackages(orgId: String): Result<List<AddablePackage>> = runCatching {
         client.postgrest.from(SupabaseTables.PACKAGES)

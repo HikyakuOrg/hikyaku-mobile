@@ -16,6 +16,8 @@ import hikyaku.sharedui.generated.resources.Res
 import hikyaku.sharedui.generated.resources.nav_home
 import hikyaku.sharedui.generated.resources.nav_packages
 import hikyaku.sharedui.generated.resources.nav_vehicles
+import hikyaku.sharedui.generated.resources.nav_warehouses
+import org.hikyaku.mobile.map.LocationPinIcon
 import org.hikyaku.mobile.theme.HikyakuTheme
 import org.jetbrains.compose.resources.stringResource
 
@@ -29,6 +31,7 @@ fun AppDrawerContent(
     onHomeClick: () -> Unit,
     onPackagesClick: () -> Unit,
     onVehiclesClick: () -> Unit,
+    onWarehousesClick: () -> Unit,
     modifier: Modifier = Modifier,
     selected: DrawerDestination = DrawerDestination.Home,
 ) {
@@ -51,11 +54,17 @@ fun AppDrawerContent(
             selected = selected == DrawerDestination.Vehicles,
             onClick = onVehiclesClick,
         )
+        NavigationDrawerItem(
+            label = { Text(stringResource(Res.string.nav_warehouses)) },
+            icon = { Icon(LocationPinIcon, contentDescription = null) },
+            selected = selected == DrawerDestination.Warehouses,
+            onClick = onWarehousesClick,
+        )
     }
 }
 
 /** Which drawer destination is currently shown, so its [NavigationDrawerItem] highlights. */
-enum class DrawerDestination { Home, Packages, Vehicles }
+enum class DrawerDestination { Home, Packages, Vehicles, Warehouses }
 
 @Preview
 @Composable
@@ -65,6 +74,7 @@ private fun AppDrawerContentPreview() {
             onHomeClick = {},
             onPackagesClick = {},
             onVehiclesClick = {},
+            onWarehousesClick = {},
             selected = DrawerDestination.Home,
         )
     }

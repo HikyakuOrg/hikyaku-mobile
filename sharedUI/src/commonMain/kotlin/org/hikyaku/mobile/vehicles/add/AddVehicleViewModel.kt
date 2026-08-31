@@ -103,6 +103,23 @@ class AddVehicleViewModel(
         _state.value = _state.value.copy(selectedWarehouseId = id)
     }
 
+    /**
+     * Re-fetches warehouses, e.g. after the user returns from the "add warehouse" screen reached
+     * via [AddVehicleUiState.warehouses] being empty. Keeps the current selection if it's still
+     * present, otherwise falls back to the only warehouse (if there's exactly one).
+     */
+    fun refreshWarehouses() {
+        viewModelScope.launch {
+            val warehouses = repository.fetchWarehouses(orgId).getOrDefault(emptyList())
+            val s = _state.value
+            _state.value = s.copy(
+                warehouses = warehouses,
+                selectedWarehouseId = warehouses.firstOrNull { it.id == s.selectedWarehouseId }?.id
+                    ?: warehouses.singleOrNull()?.id,
+            )
+        }
+    }
+
     fun addImages(images: List<ByteArray>) {
         if (images.isEmpty()) return
         _state.value = _state.value.copy(images = _state.value.images + images)

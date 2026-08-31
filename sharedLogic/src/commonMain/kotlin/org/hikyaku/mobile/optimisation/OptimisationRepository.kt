@@ -26,7 +26,7 @@ import org.hikyaku.mobile.net.appHttpClient
  * `POST /api/v1/optimisation/run` (which assigns every unassigned package at that warehouse to a
  * route), then [fetchLatestRun] polls `GET /api/v1/optimisation/run/latest` for its outcome. Both
  * endpoints are authenticated with the caller's Supabase access token and scoped with the
- * `X-Organisation-Slug` header, matching [org.hikyaku.mobile.shift.create.CreateShiftRepository].
+ * `X-Organisation-Slug` header.
  */
 class OptimisationRepository(
     private val client: SupabaseClient = SupabaseClientProvider.client,

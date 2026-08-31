@@ -32,8 +32,6 @@ import org.hikyaku.mobile.packages.add.AddPackageScreen
 import org.hikyaku.mobile.packages.add.AddPackageViewModel
 import org.hikyaku.mobile.shift.ShiftDetailScreen
 import org.hikyaku.mobile.shift.ShiftDetailViewModel
-import org.hikyaku.mobile.shift.create.CreateShiftScreen
-import org.hikyaku.mobile.shift.create.CreateShiftViewModel
 import org.hikyaku.mobile.vehicles.VehiclesScreen
 import org.hikyaku.mobile.vehicles.VehiclesViewModel
 import org.hikyaku.mobile.vehicles.add.AddVehicleScreen
@@ -42,12 +40,13 @@ import org.hikyaku.mobile.vehicles.detail.VehicleDetailScreen
 import org.hikyaku.mobile.vehicles.detail.VehicleDetailViewModel
 import org.hikyaku.mobile.vehicles.maintenance.AddMaintenanceScreen
 import org.hikyaku.mobile.vehicles.maintenance.AddMaintenanceViewModel
+import org.hikyaku.mobile.warehouse.WarehousesScreen
+import org.hikyaku.mobile.warehouse.WarehousesViewModel
+import org.hikyaku.mobile.warehouse.add.AddWarehouseScreen
+import org.hikyaku.mobile.warehouse.add.AddWarehouseViewModel
 
 @Serializable
 internal object HomeRoute
-
-@Serializable
-internal object CreateShiftRoute
 
 @Serializable
 internal data class ShiftDetailRoute(val shiftId: String)
@@ -73,6 +72,12 @@ internal data class VehicleDetailRoute(val vehicleId: String)
 @Serializable
 internal data class AddMaintenanceRoute(val vehicleId: String)
 
+@Serializable
+internal object WarehousesRoute
+
+@Serializable
+internal object AddWarehouseRoute
+
 /** [androidx.lifecycle.SavedStateHandle] key AddPackageRoute uses to signal PackagesRoute to refresh. */
 private const val PACKAGE_CREATED_KEY = "package_created"
 
@@ -81,6 +86,12 @@ private const val VEHICLE_CREATED_KEY = "vehicle_created"
 
 /** [androidx.lifecycle.SavedStateHandle] key AddMaintenanceRoute uses to signal VehicleDetailRoute to refresh. */
 private const val MAINTENANCE_CREATED_KEY = "maintenance_created"
+
+/**
+ * [androidx.lifecycle.SavedStateHandle] key AddWarehouseRoute uses to signal whichever screen
+ * navigated to it (WarehousesRoute, or AddVehicleRoute's "add a warehouse first" prompt) to refresh.
+ */
+private const val WAREHOUSE_CREATED_KEY = "warehouse_created"
 
 /**
  * Navigation for the authenticated area: the shift list (home) and a shift's detail page.
@@ -143,6 +154,16 @@ fun MainNavGraph(
                         }
                     }
                 },
+                onWarehousesClick = {
+                    scope.launch {
+                        drawerState.close()
+                        drawerDestination = DrawerDestination.Warehouses
+                        navController.navigate(WarehousesRoute) {
+                            popUpTo(HomeRoute)
+                            launchSingleTop = true
+                        }
+                    }
+                },
             )
         },
         modifier = modifier,
@@ -171,45 +192,10 @@ fun MainNavGraph(
                     onShiftClick = { shiftId ->
                         navController.navigate(ShiftDetailRoute(shiftId))
                     },
-                    onCreateShift = { navController.navigate(CreateShiftRoute) },
                     onDeleteShift = { shiftId, onResult ->
                         homeState.selectedOrgId?.let { orgId -> viewModel.deleteShift(orgId, shiftId, onResult) }
                             ?: onResult(null)
                     },
-                )
-            }
-            composable<CreateShiftRoute>(
-                // Same MapLibre-over-crossfade issue as ShiftDetailRoute (see HomeRoute's
-                // popEnterTransition above): CreateShiftRoute's WarehouseMap stays opaque during
-                // the default pop-exit fade and lingers over the incoming calendar. Skip it.
-                popExitTransition = { ExitTransition.None },
-            ) { entry ->
-                val createViewModel: CreateShiftViewModel = viewModel {
-                    CreateShiftViewModel(
-                        orgId = homeState.selectedOrgId.orEmpty(),
-                        orgSlug = homeState.selectedOrganisation?.slug.orEmpty(),
-                        isPersonalOrg = homeState.selectedOrganisation?.isPersonal == true,
-                    )
-                }
-                // Set by AddVehicleRoute's onDone, so returning from a successful add refreshes the vehicle list.
-                val vehicleCreated by entry.savedStateHandle.getStateFlow(VEHICLE_CREATED_KEY, false).collectAsState()
-                LaunchedEffect(vehicleCreated) {
-                    if (vehicleCreated) {
-                        createViewModel.refreshVehicles()
-                        entry.savedStateHandle[VEHICLE_CREATED_KEY] = false
-                    }
-                }
-                CreateShiftScreen(
-                    viewModel = createViewModel,
-                    onDone = {
-                        navController.popBackStack()
-                        homeState.selectedOrgId?.let(viewModel::loadShifts)
-                    },
-                    onCancel = {
-                        createViewModel.discardDraft()
-                        navController.popBackStack()
-                    },
-                    onAddVehicle = { navController.navigate(AddVehicleRoute) },
                 )
             }
             composable<PackagesRoute> { entry ->
@@ -312,9 +298,17 @@ fun MainNavGraph(
                     onCancel = { navController.popBackStack() },
                 )
             }
-            composable<AddVehicleRoute> {
+            composable<AddVehicleRoute> { entry ->
                 val addVehicleViewModel: AddVehicleViewModel = viewModel {
                     AddVehicleViewModel(orgId = homeState.selectedOrgId.orEmpty())
+                }
+                // Set by AddWarehouseRoute's onDone, so returning from a successful add refreshes the warehouse list.
+                val warehouseCreated by entry.savedStateHandle.getStateFlow(WAREHOUSE_CREATED_KEY, false).collectAsState()
+                LaunchedEffect(warehouseCreated) {
+                    if (warehouseCreated) {
+                        addVehicleViewModel.refreshWarehouses()
+                        entry.savedStateHandle[WAREHOUSE_CREATED_KEY] = false
+                    }
                 }
                 AddVehicleScreen(
                     viewModel = addVehicleViewModel,
@@ -323,6 +317,7 @@ fun MainNavGraph(
                         navController.popBackStack()
                     },
                     onCancel = { navController.popBackStack() },
+                    onAddWarehouse = { navController.navigate(AddWarehouseRoute) },
                 )
             }
             composable<AddPackageRoute> {
@@ -337,6 +332,43 @@ fun MainNavGraph(
                     viewModel = addPackageViewModel,
                     onDone = {
                         navController.previousBackStackEntry?.savedStateHandle?.set(PACKAGE_CREATED_KEY, true)
+                        navController.popBackStack()
+                    },
+                    onCancel = { navController.popBackStack() },
+                )
+            }
+            composable<WarehousesRoute> { entry ->
+                val warehousesViewModel: WarehousesViewModel = viewModel(key = homeState.selectedOrgId) {
+                    WarehousesViewModel(
+                        orgId = homeState.selectedOrgId.orEmpty(),
+                        isPersonalOrg = homeState.selectedOrganisation?.isPersonal == true,
+                    )
+                }
+                val warehousesState by warehousesViewModel.state.collectAsState()
+                // Set by AddWarehouseRoute's onDone, so returning from a successful add refreshes the list.
+                val warehouseCreated by entry.savedStateHandle.getStateFlow(WAREHOUSE_CREATED_KEY, false).collectAsState()
+                LaunchedEffect(warehouseCreated) {
+                    if (warehouseCreated) {
+                        warehousesViewModel.load()
+                        entry.savedStateHandle[WAREHOUSE_CREATED_KEY] = false
+                    }
+                }
+                WarehousesScreen(
+                    state = warehousesState,
+                    onOpenDrawer = { scope.launch { drawerState.open() } },
+                    onAddWarehouse = { navController.navigate(AddWarehouseRoute) },
+                    onRetry = warehousesViewModel::load,
+                    onRefresh = warehousesViewModel::refresh,
+                )
+            }
+            composable<AddWarehouseRoute> {
+                val addWarehouseViewModel: AddWarehouseViewModel = viewModel {
+                    AddWarehouseViewModel(orgId = homeState.selectedOrgId.orEmpty())
+                }
+                AddWarehouseScreen(
+                    viewModel = addWarehouseViewModel,
+                    onDone = {
+                        navController.previousBackStackEntry?.savedStateHandle?.set(WAREHOUSE_CREATED_KEY, true)
                         navController.popBackStack()
                     },
                     onCancel = { navController.popBackStack() },

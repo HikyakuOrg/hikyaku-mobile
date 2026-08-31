@@ -8,7 +8,7 @@ import kotlin.test.assertTrue
 import kotlin.time.Instant
 import org.hikyaku.mobile.geocode.model.AddressSuggestion
 import org.hikyaku.mobile.packages.model.PackageDraft
-import org.hikyaku.mobile.shift.create.model.ShiftCustomerInput
+import org.hikyaku.mobile.customer.model.CustomerInput
 
 /**
  * Tests the `PackageDraft` -> `CreatePackageDto` mapping — the whole request side of
@@ -37,8 +37,8 @@ class PackageDraftMappingTest {
     ) = PackageDraft(
         organisationId = "org-1",
         orgSlug = "acme",
-        sender = ShiftCustomerInput("Sender", "+61400000001", address("1 Smith St")),
-        receiver = ShiftCustomerInput("Receiver", "+61400000002", address("2 Brunswick St")),
+        sender = CustomerInput("Sender", "+61400000001", address("1 Smith St")),
+        receiver = CustomerInput("Receiver", "+61400000002", address("2 Brunswick St")),
         warehouseId = "wh-1",
         weightKg = 2.5,
         lengthCm = 30.0,
@@ -79,8 +79,8 @@ class PackageDraftMappingTest {
         val defaulted = PackageDraft(
             organisationId = "org-1",
             orgSlug = "acme",
-            sender = ShiftCustomerInput("Sender", "+61400000001", address("1 Smith St")),
-            receiver = ShiftCustomerInput("Receiver", "+61400000002", address("2 Brunswick St")),
+            sender = CustomerInput("Sender", "+61400000001", address("1 Smith St")),
+            receiver = CustomerInput("Receiver", "+61400000002", address("2 Brunswick St")),
             warehouseId = "wh-1",
             weightKg = 2.5,
             lengthCm = 30.0,

@@ -30,6 +30,7 @@
     <string name="nav_home">Home</string>
     <string name="nav_packages">Packages</string>
     <string name="nav_vehicles">Vehicles</string>
+    <string name="nav_warehouses">Warehouses</string>
 
     <!-- Account switcher -->
     <string name="account_no_display_name">No display name</string>
@@ -65,6 +66,7 @@
     <string name="error_load_packages">Unable to load packages.</string>
     <string name="error_load_package">Unable to load this package.</string>
     <string name="error_load_vehicles">Unable to load vehicles.</string>
+    <string name="error_load_warehouses">Unable to load warehouses.</string>
 
     <!-- Auth -->
     <string name="auth_sign_in">Sign In</string>
@@ -196,19 +198,8 @@
     <string name="shift_updated_replanned">Your shift was updated.</string>
     <string name="shift_updated_action_reload">Reload</string>
 
-    <!-- Create shift -->
-    <string name="create_shift_title">New shift</string>
-    <string name="create_shift_submit">Create &amp; optimise</string>
-    <string name="create_shift_step_details">Details</string>
-    <string name="create_shift_step_packages">Packages</string>
-    <string name="create_shift_step_review">Review</string>
-    <string name="create_shift_section_vehicle_type">Vehicle</string>
-    <string name="create_shift_no_vehicles_title">No vehicles yet</string>
-    <string name="create_shift_no_vehicles_body">Add a vehicle to your fleet before creating a shift.</string>
-    <string name="create_shift_add_vehicle_cta">Add a vehicle</string>
-    <string name="create_shift_section_start_datetime">Start date &amp; time</string>
+    <!-- Shared address/location entry (packages' starting warehouse, the standalone warehouse form) -->
     <string name="create_shift_pick_date">Pick date</string>
-    <string name="create_shift_section_starting_location">Starting location (warehouse)</string>
     <string name="create_shift_add_new_location">+ Add a new starting location</string>
     <string name="create_shift_label_location_name">Name (e.g. Home)</string>
     <string name="create_shift_label_search_address">Search address</string>
@@ -220,26 +211,7 @@
     <string name="location_picker_title">Choose a location</string>
     <string name="location_picker_confirm">Use this location</string>
     <string name="location_picker_resolving">Finding address…</string>
-    <string name="create_shift_no_packages_available">No unassigned packages at this location yet. Create one below.</string>
-    <string name="create_shift_add_new_package">+ Create a new package</string>
-    <string name="create_shift_delivery_by">Delivery by %1$s:%2$s</string>
-    <string name="create_shift_delivery_time_suffix">  ·  by %1$s:%2$s</string>
-    <string name="create_shift_delivery_time_optional">Delivery time (optional)</string>
-    <string name="create_shift_review_vehicle">Vehicle</string>
-    <string name="create_shift_review_start">Start</string>
-    <string name="create_shift_review_from">From</string>
-    <string name="create_shift_review_stops">Packages</string>
     <string name="create_shift_label_name">Name</string>
-    <string name="create_shift_error_load_vehicle_types">Couldn't load vehicles.</string>
-    <string name="create_shift_error_choose_vehicle">Choose a vehicle.</string>
-    <string name="create_shift_error_choose_date">Choose a start date.</string>
-    <string name="create_shift_error_choose_location">Search and select a starting location.</string>
-    <string name="create_shift_error_name_location">Name your starting location.</string>
-    <string name="create_shift_error_choose_saved_location">Choose a starting location.</string>
-    <string name="create_shift_error_no_packages">Select or create at least one package.</string>
-    <string name="create_shift_error_save_location_failed">Couldn't save the starting location.</string>
-    <string name="create_shift_error_submit_failed">Couldn't create the shift.</string>
-    <string name="create_shift_error_package_conflict">One or more selected packages were already used in another shift. Review your selection and try again.</string>
 
     <!-- Package overview -->
     <string name="package_overview_title">Packages</string>
@@ -356,6 +328,9 @@
     <string name="vehicle_error_choose_type">Choose a vehicle type.</string>
     <string name="vehicle_error_choose_warehouse">Choose a home warehouse.</string>
     <string name="vehicle_error_submit_failed">Couldn't create the vehicle.</string>
+    <string name="vehicle_no_warehouses_title">No warehouses yet</string>
+    <string name="vehicle_no_warehouses_body">Add a warehouse before adding a vehicle.</string>
+    <string name="vehicle_add_warehouse_cta">Add a warehouse</string>
 
     <!-- Vehicle detail -->
     <string name="vehicle_detail_title">Vehicle</string>
@@ -385,6 +360,17 @@
     <string name="maintenance_error_missing_description">Enter a description.</string>
     <string name="maintenance_error_choose_date">Choose the date serviced.</string>
     <string name="maintenance_error_submit_failed">Couldn't save the maintenance record.</string>
+
+    <!-- Warehouse overview -->
+    <string name="warehouse_overview_title">Warehouses</string>
+    <string name="warehouse_no_warehouses">No warehouses yet.</string>
+
+    <!-- Add warehouse -->
+    <string name="warehouse_add_title">Add Warehouse</string>
+    <string name="warehouse_submit">Add Warehouse</string>
+    <string name="warehouse_error_choose_location">Search and select a location.</string>
+    <string name="warehouse_error_name">Name this warehouse.</string>
+    <string name="warehouse_error_submit_failed">Couldn't save the warehouse.</string>
 
     <!-- Team invitations -->
     <string name="invitation_dialog_title">Team invitations</string>

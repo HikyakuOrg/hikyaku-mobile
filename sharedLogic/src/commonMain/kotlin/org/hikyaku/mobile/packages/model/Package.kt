@@ -2,7 +2,7 @@ package org.hikyaku.mobile.packages.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
-import org.hikyaku.mobile.shift.create.model.ShiftCustomerInput
+import org.hikyaku.mobile.customer.model.CustomerInput
 import org.hikyaku.mobile.util.formatIsoAsDisplayDate
 
 /** A row from `packages`, as shown in the package overview list. */
@@ -93,8 +93,8 @@ data class PackageTimelineEntry(
 data class PackageDraft(
     val organisationId: String,
     val orgSlug: String,
-    val sender: ShiftCustomerInput,
-    val receiver: ShiftCustomerInput,
+    val sender: CustomerInput,
+    val receiver: CustomerInput,
     val warehouseId: String,
     val weightKg: Double,
     val lengthCm: Double,
@@ -108,12 +108,6 @@ data class PackageDraft(
      */
     val scheduledArrival: String,
     val images: List<ByteArray>,
-    /**
-     * Whether the backend should assign the package to a shift as soon as it is created.
-     *
-     * The create-shift wizard MUST pass false: it creates packages and then hands their ids to
-     * `POST /api/v1/optimisation/adhoc`, which rejects a package that already belongs to an
-     * optimisation with a 409. Everywhere else wants the default — instant assignment is the point.
-     */
+    /** Whether the backend should assign the package to a shift as soon as it is created. */
     val autoAssign: Boolean = true,
 )

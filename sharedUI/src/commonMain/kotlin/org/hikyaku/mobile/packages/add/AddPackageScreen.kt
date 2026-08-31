@@ -63,8 +63,6 @@ import hikyaku.sharedui.generated.resources.action_back
 import hikyaku.sharedui.generated.resources.action_cancel
 import hikyaku.sharedui.generated.resources.action_ok
 import hikyaku.sharedui.generated.resources.action_remove
-import hikyaku.sharedui.generated.resources.address_autocomplete_no_results
-import hikyaku.sharedui.generated.resources.address_pick_on_map
 import hikyaku.sharedui.generated.resources.cd_package_photo
 import hikyaku.sharedui.generated.resources.create_shift_add_new_location
 import hikyaku.sharedui.generated.resources.create_shift_label_address
@@ -104,12 +102,10 @@ import hikyaku.sharedui.generated.resources.package_section_warehouse
 import hikyaku.sharedui.generated.resources.package_submit
 import hikyaku.sharedui.generated.resources.warehouse_personal_org_limit_notice
 import org.hikyaku.mobile.api.generated.models.AssignmentOutcomeDto
+import org.hikyaku.mobile.customer.model.CustomerSuggestion
 import org.hikyaku.mobile.geocode.model.AddressSuggestion
-import org.hikyaku.mobile.map.LocationPickerDialog
-import org.hikyaku.mobile.map.LocationPinIcon
+import org.hikyaku.mobile.map.AddressAutocompleteField
 import org.hikyaku.mobile.phone.PhoneNumberField
-import org.hikyaku.mobile.shift.create.CustomerDraft
-import org.hikyaku.mobile.shift.create.model.CustomerSuggestion
 import org.hikyaku.mobile.shift.rememberImagePicker
 import org.hikyaku.mobile.shift.rememberPhotoCapture
 import org.hikyaku.mobile.theme.HikyakuTheme
@@ -120,10 +116,10 @@ import org.jetbrains.compose.resources.stringResource
 import org.maplibre.spatialk.geojson.Position
 
 /**
- * Single-page add-package form: physical dimensions, optional photos (camera or gallery), sender
- * and receiver details (address-autocompleted, same as the create-shift customer step), delivery
- * notes, starting warehouse, and the scheduled arrival date/time. Submits through
- * [AddPackageViewModel], which persists everything via `PackageRepository`.
+ * Single-page add-package form: physical dimensions, optional photos (camera or gallery),
+ * address-autocompleted sender and receiver details, delivery notes, starting warehouse, and the
+ * scheduled arrival date/time. Submits through [AddPackageViewModel], which persists everything
+ * via `PackageRepository`.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -468,7 +464,7 @@ private fun CustomerFields(
         onCountrySelected = onCountryChange,
     )
     Spacer(Modifier.height(8.dp))
-    AddressAutocomplete(
+    AddressAutocompleteField(
         label = stringResource(Res.string.create_shift_label_address),
         query = customer.addressQuery,
         suggestions = customer.suggestions,
@@ -520,7 +516,7 @@ private fun WarehouseSection(
             modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
-        AddressAutocomplete(
+        AddressAutocompleteField(
             label = stringResource(Res.string.create_shift_label_search_address),
             query = state.warehouseQuery,
             suggestions = state.warehouseSuggestions,
@@ -598,69 +594,6 @@ private fun ArrivalSection(
         )
     }
 }
-
-@Composable
-private fun AddressAutocomplete(
-    label: String,
-    query: String,
-    suggestions: List<AddressSuggestion>,
-    searching: Boolean,
-    hasSelection: Boolean,
-    initialMapPosition: Position?,
-    onQueryChange: (String) -> Unit,
-    onPick: (AddressSuggestion) -> Unit,
-) {
-    var showLocationPicker by remember { mutableStateOf(false) }
-    Column(Modifier.fillMaxWidth()) {
-        OutlinedTextField(
-            value = query,
-            onValueChange = onQueryChange,
-            label = { Text(label) },
-            singleLine = true,
-            trailingIcon = if (searching) {
-                { CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp) }
-            } else {
-                null
-            },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        TextButton(onClick = { showLocationPicker = true }) {
-            Icon(LocationPinIcon, contentDescription = null, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(stringResource(Res.string.address_pick_on_map))
-        }
-        if (!searching && !hasSelection && suggestions.isEmpty() && query.trim().length >= ADDRESS_MIN_QUERY_LENGTH) {
-            Text(
-                text = stringResource(Res.string.address_autocomplete_no_results),
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
-            )
-        } else {
-            suggestions.take(5).forEach { s ->
-                Text(
-                    text = s.label,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.fillMaxWidth().clickable { onPick(s) }.padding(vertical = 10.dp, horizontal = 4.dp),
-                )
-                HorizontalDivider()
-            }
-        }
-    }
-    if (showLocationPicker) {
-        LocationPickerDialog(
-            initialPosition = initialMapPosition,
-            onDismiss = { showLocationPicker = false },
-            onConfirm = {
-                onPick(it)
-                showLocationPicker = false
-            },
-        )
-    }
-}
-
-/** Mirrors [org.hikyaku.mobile.packages.add.AddPackageViewModel]'s geocode debounce threshold. */
-private const val ADDRESS_MIN_QUERY_LENGTH = 3
 
 @Composable
 private fun DateTimeField(text: String, onClick: () -> Unit, modifier: Modifier = Modifier) {

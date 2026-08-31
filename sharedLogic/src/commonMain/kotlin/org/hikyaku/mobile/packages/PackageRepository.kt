@@ -35,27 +35,24 @@ import org.hikyaku.mobile.packages.model.PackageDraft
 import org.hikyaku.mobile.packages.model.PackageParty
 import org.hikyaku.mobile.packages.model.PackageSummary
 import org.hikyaku.mobile.packages.model.PackageTimelineEntry
-import org.hikyaku.mobile.shift.create.PackageConflictException
-import org.hikyaku.mobile.shift.create.model.CustomerSuggestion
-import org.hikyaku.mobile.shift.create.model.ShiftCustomerInput
-import org.hikyaku.mobile.shift.create.model.WarehouseOption
+import org.hikyaku.mobile.customer.model.CustomerInput
+import org.hikyaku.mobile.customer.model.CustomerSuggestion
 import org.hikyaku.mobile.supabase.SupabaseBuckets
 import org.hikyaku.mobile.supabase.SupabaseTables
 import org.maplibre.spatialk.geojson.Point
 
 /**
  * Backs the package overview list and the add-package form. Packages carry their sender and
- * receiver as `customer` rows (reusing a returning customer keyed by phone, same de-duplication as
- * [org.hikyaku.mobile.shift.create.CreateShiftRepository]), a required starting [SupabaseTables.WAREHOUSE],
- * physical dimensions in `package_dimensions`, a delivery window in `package_delivery_window`, and
- * optional photos uploaded to the private `packages` storage bucket under `{packageId}/...` and
- * recorded in `package_proof_of_delivery`. `packages.tracking_number` is left unset on insert — a
- * `BEFORE INSERT` trigger (`packages_set_tracking_number`) generates it server-side.
+ * receiver as `customer` rows (reusing a returning customer keyed by phone), a required starting
+ * [SupabaseTables.WAREHOUSE], physical dimensions in `package_dimensions`, a delivery window in
+ * `package_delivery_window`, and optional photos uploaded to the private `packages` storage bucket
+ * under `{packageId}/...` and recorded in `package_proof_of_delivery`. `packages.tracking_number`
+ * is left unset on insert — a `BEFORE INSERT` trigger (`packages_set_tracking_number`) generates it
+ * server-side.
  *
  * Reads still go through PostgREST; [createPackage] goes through `POST /api/v1/packages` so the
  * write is one transaction and the package can be assigned to a shift on the spot. The API call is
- * authenticated with the caller's Supabase access token and scoped with `X-Organisation-Slug`,
- * matching [org.hikyaku.mobile.shift.create.CreateShiftRepository].
+ * authenticated with the caller's Supabase access token and scoped with `X-Organisation-Slug`.
  */
 class PackageRepository(
     private val client: SupabaseClient = SupabaseClientProvider.client,
@@ -104,7 +101,7 @@ class PackageRepository(
     /**
      * [StorageItem]s for every proof-of-delivery photo under `{packageId}/` in the private
      * `packages` bucket, or an empty list when there are none. Returns failure only on a real
-     * error; a missing/empty folder yields an empty list. Mirrors [fetchWarehouses]-style access.
+     * error; a missing/empty folder yields an empty list.
      */
     suspend fun fetchPackageImages(packageId: String): Result<List<StorageItem>> = runCatching {
         val bucket = client.storage.from(SupabaseBuckets.PACKAGES)
@@ -116,9 +113,8 @@ class PackageRepository(
 
     /**
      * How many of [orgId]'s packages at [warehouseId] are unassigned (`optimisation_id IS NULL`) —
-     * the set a warehouse-wide optimisation run would pick up. Mirrors the same filter as
-     * [org.hikyaku.mobile.shift.create.CreateShiftRepository.fetchAvailablePackages], but only
-     * selects `id` since the caller just needs a count.
+     * the set a warehouse-wide optimisation run would pick up. Only selects `id` since the caller
+     * just needs a count.
      */
     suspend fun countUnassignedPackages(orgId: String, warehouseId: String): Result<Int> = runCatching {
         client.postgrest.from(SupabaseTables.PACKAGES)
@@ -133,40 +129,9 @@ class PackageRepository(
             .size
     }
 
-    /** The org's existing warehouses, so the user can pick a starting location for the package. */
-    suspend fun fetchWarehouses(orgId: String): Result<List<WarehouseOption>> = runCatching {
-        client.postgrest.from(SupabaseTables.WAREHOUSE)
-            .select(Columns.raw("id, warehouse_name, warehouse_address, warehouse_location")) {
-                filter { eq("organisation_id", orgId) }
-            }
-            .decodeList<WarehouseRow>()
-            .map { it.toOption() }
-    }
-
-    /** Geocodes-and-persists a new warehouse from a chosen [address]. */
-    suspend fun createWarehouse(orgId: String, name: String, address: AddressSuggestion): Result<WarehouseOption> =
-        runCatching {
-            val id = newId()
-            client.postgrest.from(SupabaseTables.WAREHOUSE).insert(
-                WarehouseInsert(
-                    id = id,
-                    warehouseName = name,
-                    warehouseAddress = address.label,
-                    warehouseLocation = pointEwkt(address.lon, address.lat),
-                    warehouseCity = address.suburb ?: "",
-                    warehouseState = address.state ?: "",
-                    warehouseCountry = address.country ?: "",
-                    warehouseZipcode = address.postcode ?: "",
-                    organisationId = orgId,
-                ),
-            )
-            WarehouseOption(id = id, name = name, address = address.label, lat = address.lat, lng = address.lon)
-        }
-
     /**
      * Existing customers of [orgId] whose name matches [query] (case-insensitive substring), so a
-     * returning sender/receiver's phone + address can be reused. Mirrors
-     * [org.hikyaku.mobile.shift.create.CreateShiftRepository.searchCustomers].
+     * returning sender/receiver's phone + address can be reused.
      */
     suspend fun searchCustomers(orgId: String, query: String): Result<List<CustomerSuggestion>> = runCatching {
         client.postgrest.from(SupabaseTables.CUSTOMER)
@@ -251,7 +216,7 @@ class PackageRepository(
      * phone match is looked up first; phone-less customers can't collide on that constraint, so
      * they're always inserted.
      */
-    private suspend fun ensureCustomer(orgId: String, customer: ShiftCustomerInput): String {
+    private suspend fun ensureCustomer(orgId: String, customer: CustomerInput): String {
         val phone = customer.phoneE164
         if (phone != null) {
             val existing = client.postgrest.from(SupabaseTables.CUSTOMER)
@@ -317,6 +282,9 @@ class PackageRepository(
         fun newId(): String = Uuid.random().toString()
     }
 }
+
+/** A 409 from [PackageRepository.createPackage]: the tracking number already belongs to a package with a different payload. */
+class PackageConflictException(message: String) : Exception(message)
 
 // ---------------------------------------------------------------------------
 // Wire models
@@ -421,21 +389,6 @@ private data class StatusRow(
 )
 
 @Serializable
-private data class WarehouseRow(
-    val id: String,
-    @SerialName("warehouse_name") val name: String,
-    @SerialName("warehouse_address") val address: String,
-    // PostGIS geometry, returned by PostgREST as a GeoJSON `Point` (`[lng, lat]`).
-    @SerialName("warehouse_location") val location: Point? = null,
-) {
-    fun toOption(): WarehouseOption {
-        val lng = location?.longitude ?: 0.0
-        val lat = location?.latitude ?: 0.0
-        return WarehouseOption(id = id, name = name, address = address, lat = lat, lng = lng)
-    }
-}
-
-@Serializable
 private data class CustomerRow(
     @SerialName("customer_name") val name: String? = null,
     @SerialName("customer_phone") val phone: String? = null,
@@ -472,19 +425,6 @@ private data class CustomerRow(
         )
     }
 }
-
-@Serializable
-private data class WarehouseInsert(
-    val id: String,
-    @SerialName("warehouse_name") val warehouseName: String,
-    @SerialName("warehouse_address") val warehouseAddress: String,
-    @SerialName("warehouse_location") val warehouseLocation: String,
-    @SerialName("warehouse_city") val warehouseCity: String,
-    @SerialName("warehouse_state") val warehouseState: String,
-    @SerialName("warehouse_country") val warehouseCountry: String,
-    @SerialName("warehouse_zipcode") val warehouseZipcode: String,
-    @SerialName("organisation_id") val organisationId: String,
-)
 
 @Serializable
 private data class CustomerInsert(

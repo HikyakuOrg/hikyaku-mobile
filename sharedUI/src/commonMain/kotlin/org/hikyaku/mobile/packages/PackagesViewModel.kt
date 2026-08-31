@@ -18,6 +18,7 @@ import org.hikyaku.mobile.optimisation.OptimisationRateLimitedException
 import org.hikyaku.mobile.optimisation.OptimisationRepository
 import org.hikyaku.mobile.packages.model.PackageSummary
 import org.hikyaku.mobile.packages.optimisation.OptimisationProgress
+import org.hikyaku.mobile.warehouse.WarehouseRepository
 import org.jetbrains.compose.resources.getString
 
 data class PackagesUiState(
@@ -44,6 +45,7 @@ class PackagesViewModel(
     private val orgId: String,
     private val orgSlug: String,
     private val repository: PackageRepository = PackageRepository(),
+    private val warehouseRepository: WarehouseRepository = WarehouseRepository(),
     private val optimisationRepository: OptimisationRepository = OptimisationRepository(),
 ) : ViewModel() {
 
@@ -85,7 +87,7 @@ class PackagesViewModel(
     fun startOptimisation() {
         if (_state.value.optimisation != null) return
         optimisationJob = viewModelScope.launch {
-            val warehouseId = repository.fetchWarehouses(orgId).getOrNull()?.firstOrNull()?.id
+            val warehouseId = warehouseRepository.fetchWarehouses(orgId).getOrNull()?.firstOrNull()?.id
             if (warehouseId == null) {
                 _state.value = _state.value.copy(optimisationToast = getString(Res.string.package_optimise_error_no_warehouse))
                 return@launch

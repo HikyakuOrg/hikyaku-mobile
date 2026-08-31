@@ -23,21 +23,40 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import org.hikyaku.mobile.customer.model.CustomerInput
+import org.hikyaku.mobile.customer.model.CustomerSuggestion
 import org.hikyaku.mobile.geocode.GeocodeRepository
 import org.hikyaku.mobile.geocode.model.AddressSuggestion
 import org.hikyaku.mobile.packages.PackageRepository
 import org.hikyaku.mobile.packages.model.PackageDraft
 import org.hikyaku.mobile.phone.PhoneNumbers
-import org.hikyaku.mobile.shift.create.CustomerDraft
-import org.hikyaku.mobile.shift.create.model.CustomerSuggestion
-import org.hikyaku.mobile.shift.create.model.ShiftCustomerInput
-import org.hikyaku.mobile.shift.create.model.WarehouseOption
 import org.hikyaku.mobile.util.combineDateAndTimeToIsoUtc
+import org.hikyaku.mobile.warehouse.WarehouseRepository
 import org.hikyaku.mobile.warehouse.canAddWarehouse
+import org.hikyaku.mobile.warehouse.model.WarehouseOption
 import org.jetbrains.compose.resources.getString
 
 /** Which party a customer-field edit applies to. */
 private enum class Party { SENDER, RECEIVER }
+
+/**
+ * A geocoded sender/receiver being composed for the package. [localId] is a stable UI key;
+ * [picked] is the geocoded address. [phone] is the national number as typed; [countryIso] is the
+ * selected region (drives dial code + validation). The two combine into the E.164 string
+ * persisted as `customer_phone`.
+ */
+data class CustomerDraft(
+    val localId: String,
+    val name: String = "",
+    val nameSuggestions: List<CustomerSuggestion> = emptyList(),
+    val nameSearching: Boolean = false,
+    val phone: String = "",
+    val countryIso: String = "",
+    val addressQuery: String = "",
+    val suggestions: List<AddressSuggestion> = emptyList(),
+    val searching: Boolean = false,
+    val picked: AddressSuggestion? = null,
+)
 
 data class AddPackageUiState(
     val isLoading: Boolean = false,
@@ -81,8 +100,7 @@ data class AddPackageUiState(
 
 /**
  * Drives the add-package form: loads the org's saved warehouses, geocodes the warehouse/sender/
- * receiver addresses via [GeocodeRepository] (debounced, mirroring
- * [org.hikyaku.mobile.shift.create.CreateShiftViewModel]), validates every field, and on submit
+ * receiver addresses via [GeocodeRepository] (debounced), validates every field, and on submit
  * persists everything through [PackageRepository].
  */
 class AddPackageViewModel(
@@ -90,6 +108,7 @@ class AddPackageViewModel(
     private val orgSlug: String,
     private val isPersonalOrg: Boolean,
     private val repository: PackageRepository = PackageRepository(),
+    private val warehouseRepository: WarehouseRepository = WarehouseRepository(),
     private val geocodeRepository: GeocodeRepository = GeocodeRepository(),
 ) : ViewModel() {
 
@@ -112,7 +131,7 @@ class AddPackageViewModel(
     private fun loadWarehouses() {
         _state.value = _state.value.copy(isLoading = true, error = null)
         viewModelScope.launch {
-            val warehouses = repository.fetchWarehouses(orgId).getOrDefault(emptyList())
+            val warehouses = warehouseRepository.fetchWarehouses(orgId).getOrDefault(emptyList())
             val canAdd = canAddWarehouse(isPersonalOrg, warehouses.size)
             _state.value = _state.value.copy(
                 isLoading = false,
@@ -376,7 +395,7 @@ class AddPackageViewModel(
      * [validationProblem] refuses a party with no picked address before this runs, so the address is
      * always present here — the check names the broken invariant if that ordering ever changes.
      */
-    private fun customerInput(draft: CustomerDraft): ShiftCustomerInput = ShiftCustomerInput(
+    private fun customerInput(draft: CustomerDraft): CustomerInput = CustomerInput(
         name = draft.name.trim(),
         phoneE164 = customerE164(draft),
         address = checkNotNull(draft.picked) {
@@ -387,7 +406,7 @@ class AddPackageViewModel(
     private suspend fun resolveWarehouse(s: AddPackageUiState): WarehouseOption? {
         if (!s.addingWarehouse) return s.warehouses.firstOrNull { it.id == s.selectedWarehouseId }
         val picked = s.pickedWarehouse ?: return null
-        return repository.createWarehouse(orgId, s.warehouseName.trim(), picked).getOrNull()
+        return warehouseRepository.createWarehouse(orgId, s.warehouseName.trim(), picked).getOrNull()
     }
 
     private suspend fun validationProblem(s: AddPackageUiState): String? {

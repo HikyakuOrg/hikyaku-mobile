@@ -33,7 +33,6 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -125,7 +124,6 @@ fun HomeScreen(
     onSaveDisplayName: (name: String, onResult: (String?) -> Unit) -> Unit,
     onUploadAvatar: (bytes: ByteArray, onResult: (String?) -> Unit) -> Unit,
     onShiftClick: (String) -> Unit,
-    onCreateShift: () -> Unit,
     onDeleteShift: (shiftId: String, onResult: (String?) -> Unit) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -194,13 +192,6 @@ fun HomeScreen(
                     }
                 },
             )
-        },
-        floatingActionButton = {
-            if (homeState.selectedOrganisation?.isPersonal == true) {
-                FloatingActionButton(onClick = onCreateShift) {
-                    Text("+", style = MaterialTheme.typography.headlineMedium)
-                }
-            }
         },
     ) { padding ->
         val visibleShifts = remember(shiftState.shifts, hiddenShiftIds) {
@@ -373,7 +364,6 @@ private fun HomeScreenPreview() {
             onSaveDisplayName = { _, _ -> },
             onUploadAvatar = { _, _ -> },
             onShiftClick = {},
-            onCreateShift = {},
             onDeleteShift = { _, _ -> },
         )
     }
@@ -407,7 +397,6 @@ private fun HomeScreenEmptyPreview() {
             onSaveDisplayName = { _, _ -> },
             onUploadAvatar = { _, _ -> },
             onShiftClick = {},
-            onCreateShift = {},
             onDeleteShift = { _, _ -> },
         )
     }
