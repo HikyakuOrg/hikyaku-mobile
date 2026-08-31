@@ -24,8 +24,7 @@ import org.hikyaku.mobile.net.appHttpClient
  * is deliberately tiny so [ShiftVersionPoll] can ask for it every 30 seconds while the shift screen
  * is on top, and the app only refetches the (expensive) route when the revision actually moved.
  *
- * Authenticated with the caller's Supabase access token and scoped with `X-Organisation-Slug`,
- * matching [org.hikyaku.mobile.optimisation.OptimisationRepository].
+ * Authenticated with the caller's Supabase access token and scoped with `X-Organisation-Slug`.
  */
 class ShiftVersionRepository(
     private val client: SupabaseClient = SupabaseClientProvider.client,

@@ -97,8 +97,7 @@ val hikyakuApiGeneratedDir = layout.buildDirectory.dir("hikyaku-api/generated").
 val hikyakuApiAppModels = listOf(
     "GeoJsonFeatureCollectionDto", "GeoJsonFeatureDto", "GeoJsonPointDto", "GeoJsonFeaturePropertiesDto",
     "RouteRequestDto", "RoutePreviewDto", "RouteLegDto", "RouteSummaryDto",
-    "AdhocOptimisationDto", "AdhocOptimisationResultDto",
-    "RunOptimisationDto", "RunOptimisationResultDto", "LatestOptimisationRunDto", "SetOffOverrideDto",
+    "AdhocOptimisationDto", "AdhocOptimisationResultDto", "SetOffOverrideDto",
     "PendingInvitationDto", "InvitationOrganisationDto", "AcceptInvitationResultDto",
     // Instant package assignment: POST /packages, POST /packages/bulk, POST /shifts,
     // GET /shifts/{id}/version.

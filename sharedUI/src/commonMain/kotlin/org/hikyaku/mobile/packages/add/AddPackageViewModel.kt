@@ -39,6 +39,9 @@ import org.jetbrains.compose.resources.getString
 /** Which party a customer-field edit applies to. */
 private enum class Party { SENDER, RECEIVER }
 
+/** The add-package wizard's pages, in order. */
+enum class AddPackageStep { Package, Sender, Receiver, Delivery }
+
 /**
  * A geocoded sender/receiver being composed for the package. [localId] is a stable UI key;
  * [picked] is the geocoded address. [phone] is the national number as typed; [countryIso] is the
@@ -69,6 +72,7 @@ data class AddPackageUiState(
      * the package landed on a shift.
      */
     val assignment: PackageAssignmentDisplay? = null,
+    val step: AddPackageStep = AddPackageStep.Package,
     // Dimensions
     val weight: String = "",
     val length: String = "",
@@ -328,6 +332,41 @@ class AddPackageViewModel(
         _state.value = _state.value.copy(arrivalHour = hour, arrivalMinute = minute)
     }
 
+    // ----- Navigation between steps -----
+
+    fun next() {
+        val s = _state.value
+        when (s.step) {
+            AddPackageStep.Package -> viewModelScope.launch {
+                val problem = packageStepProblem(s)
+                if (problem != null) return@launch setError(problem)
+                _state.value = s.copy(step = AddPackageStep.Sender, error = null)
+            }
+            AddPackageStep.Sender -> viewModelScope.launch {
+                val problem = senderStepProblem(s)
+                if (problem != null) return@launch setError(problem)
+                _state.value = s.copy(step = AddPackageStep.Receiver, error = null)
+            }
+            AddPackageStep.Receiver -> viewModelScope.launch {
+                val problem = receiverStepProblem(s)
+                if (problem != null) return@launch setError(problem)
+                _state.value = s.copy(step = AddPackageStep.Delivery, error = null)
+            }
+            AddPackageStep.Delivery -> submit()
+        }
+    }
+
+    fun back() {
+        val s = _state.value
+        val previous = when (s.step) {
+            AddPackageStep.Package -> AddPackageStep.Package
+            AddPackageStep.Sender -> AddPackageStep.Package
+            AddPackageStep.Receiver -> AddPackageStep.Sender
+            AddPackageStep.Delivery -> AddPackageStep.Receiver
+        }
+        _state.value = s.copy(step = previous, error = null)
+    }
+
     // ----- Submit -----
 
     fun clearError() {
@@ -409,7 +448,11 @@ class AddPackageViewModel(
         return warehouseRepository.createWarehouse(orgId, s.warehouseName.trim(), picked).getOrNull()
     }
 
-    private suspend fun validationProblem(s: AddPackageUiState): String? {
+    /** Combines every step's checks; the final safety net before [submit] persists anything. */
+    private suspend fun validationProblem(s: AddPackageUiState): String? =
+        packageStepProblem(s) ?: senderStepProblem(s) ?: receiverStepProblem(s) ?: deliveryStepProblem(s)
+
+    private suspend fun packageStepProblem(s: AddPackageUiState): String? {
         val weight = s.weight.trim().toDoubleOrNull()
         val length = s.length.trim().toDoubleOrNull()
         val width = s.width.trim().toDoubleOrNull()
@@ -418,19 +461,31 @@ class AddPackageViewModel(
             weight == null || weight <= 0 -> getString(Res.string.package_error_invalid_weight)
             length == null || length <= 0 || width == null || width <= 0 || height == null || height <= 0 ->
                 getString(Res.string.package_error_invalid_dimensions)
-            s.sender.name.isBlank() -> getString(Res.string.package_error_sender_needs_name)
-            customerE164(s.sender) == null -> getString(Res.string.package_error_sender_needs_phone)
-            s.sender.picked == null -> getString(Res.string.package_error_sender_needs_address)
-            s.receiver.name.isBlank() -> getString(Res.string.package_error_receiver_needs_name)
-            customerE164(s.receiver) == null -> getString(Res.string.package_error_receiver_needs_phone)
-            s.receiver.picked == null -> getString(Res.string.package_error_receiver_needs_address)
-            s.addingWarehouse && s.pickedWarehouse == null -> getString(Res.string.package_error_choose_warehouse)
-            s.addingWarehouse && s.warehouseName.isBlank() -> getString(Res.string.package_error_name_warehouse)
-            !s.addingWarehouse && s.selectedWarehouseId == null ->
-                getString(Res.string.package_error_choose_saved_warehouse)
-            s.arrivalDateMillis == null -> getString(Res.string.package_error_choose_arrival)
             else -> null
         }
+    }
+
+    private suspend fun senderStepProblem(s: AddPackageUiState): String? = when {
+        s.sender.name.isBlank() -> getString(Res.string.package_error_sender_needs_name)
+        customerE164(s.sender) == null -> getString(Res.string.package_error_sender_needs_phone)
+        s.sender.picked == null -> getString(Res.string.package_error_sender_needs_address)
+        else -> null
+    }
+
+    private suspend fun receiverStepProblem(s: AddPackageUiState): String? = when {
+        s.receiver.name.isBlank() -> getString(Res.string.package_error_receiver_needs_name)
+        customerE164(s.receiver) == null -> getString(Res.string.package_error_receiver_needs_phone)
+        s.receiver.picked == null -> getString(Res.string.package_error_receiver_needs_address)
+        else -> null
+    }
+
+    private suspend fun deliveryStepProblem(s: AddPackageUiState): String? = when {
+        s.addingWarehouse && s.pickedWarehouse == null -> getString(Res.string.package_error_choose_warehouse)
+        s.addingWarehouse && s.warehouseName.isBlank() -> getString(Res.string.package_error_name_warehouse)
+        !s.addingWarehouse && s.selectedWarehouseId == null ->
+            getString(Res.string.package_error_choose_saved_warehouse)
+        s.arrivalDateMillis == null -> getString(Res.string.package_error_choose_arrival)
+        else -> null
     }
 
     private fun setError(message: String) {

@@ -112,24 +112,6 @@ class PackageRepository(
     }
 
     /**
-     * How many of [orgId]'s packages at [warehouseId] are unassigned (`optimisation_id IS NULL`) —
-     * the set a warehouse-wide optimisation run would pick up. Only selects `id` since the caller
-     * just needs a count.
-     */
-    suspend fun countUnassignedPackages(orgId: String, warehouseId: String): Result<Int> = runCatching {
-        client.postgrest.from(SupabaseTables.PACKAGES)
-            .select(Columns.raw("id")) {
-                filter {
-                    eq("organisation_id", orgId)
-                    eq("warehouse_id", warehouseId)
-                    exact("optimisation_id", null)
-                }
-            }
-            .decodeList<IdRow>()
-            .size
-    }
-
-    /**
      * Existing customers of [orgId] whose name matches [query] (case-insensitive substring), so a
      * returning sender/receiver's phone + address can be reused.
      */

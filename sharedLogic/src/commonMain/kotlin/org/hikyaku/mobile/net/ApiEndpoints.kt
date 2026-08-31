@@ -30,19 +30,6 @@ object ApiEndpoints {
     fun optimisationAdhoc(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/optimisation/adhoc"
 
     /**
-     * `POST {apiUrl}/api/v1/optimisation/run` — queues a warehouse-wide optimisation run that
-     * assigns all of its unassigned packages to routes. Returns immediately with the queued run's
-     * id; poll [optimisationRunLatest] for its outcome.
-     */
-    fun optimisationRun(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/optimisation/run"
-
-    /**
-     * `GET {apiUrl}/api/v1/optimisation/run/latest` — the organisation's most recent
-     * warehouse-wide optimisation run (or null if it has never run one).
-     */
-    fun optimisationRunLatest(apiUrl: String) = "${apiUrl.trimEnd('/')}/api/v1/optimisation/run/latest"
-
-    /**
      * `POST {apiUrl}/api/v1/packages` — creates one package (row, dimensions, delivery window and
      * opening timeline entry) in a single transaction and, unless `autoAssign` is false, assigns it
      * to a shift straight away. Always 201 — a failed assignment comes back as an outcome on the

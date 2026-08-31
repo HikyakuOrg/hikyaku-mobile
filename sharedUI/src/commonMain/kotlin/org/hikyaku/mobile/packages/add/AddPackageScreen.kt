@@ -1,5 +1,6 @@
 package org.hikyaku.mobile.packages.add
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -54,13 +55,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import hikyaku.sharedui.generated.resources.Res
 import hikyaku.sharedui.generated.resources.action_back
 import hikyaku.sharedui.generated.resources.action_cancel
+import hikyaku.sharedui.generated.resources.action_next
 import hikyaku.sharedui.generated.resources.action_ok
 import hikyaku.sharedui.generated.resources.action_remove
 import hikyaku.sharedui.generated.resources.cd_package_photo
@@ -96,9 +100,11 @@ import hikyaku.sharedui.generated.resources.package_outcome_title
 import hikyaku.sharedui.generated.resources.package_section_arrival
 import hikyaku.sharedui.generated.resources.package_section_dimensions
 import hikyaku.sharedui.generated.resources.package_section_images
-import hikyaku.sharedui.generated.resources.package_section_receiver
-import hikyaku.sharedui.generated.resources.package_section_sender
 import hikyaku.sharedui.generated.resources.package_section_warehouse
+import hikyaku.sharedui.generated.resources.package_step_delivery
+import hikyaku.sharedui.generated.resources.package_step_package
+import hikyaku.sharedui.generated.resources.package_step_receiver
+import hikyaku.sharedui.generated.resources.package_step_sender
 import hikyaku.sharedui.generated.resources.package_submit
 import hikyaku.sharedui.generated.resources.warehouse_personal_org_limit_notice
 import org.hikyaku.mobile.api.generated.models.AssignmentOutcomeDto
@@ -116,10 +122,10 @@ import org.jetbrains.compose.resources.stringResource
 import org.maplibre.spatialk.geojson.Position
 
 /**
- * Single-page add-package form: physical dimensions, optional photos (camera or gallery),
- * address-autocompleted sender and receiver details, delivery notes, starting warehouse, and the
- * scheduled arrival date/time. Submits through [AddPackageViewModel], which persists everything
- * via `PackageRepository`.
+ * Add-package wizard: physical dimensions and optional photos, then sender, then receiver, then
+ * delivery notes/starting warehouse/scheduled arrival — one page per step so the driver isn't
+ * facing every field at once. [AddPackageViewModel] validates each step on "Next" and persists
+ * everything via `PackageRepository` once the final step is submitted.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,7 +147,8 @@ fun AddPackageScreen(
 
     AddPackageScreenContent(
         state = state,
-        onSubmit = viewModel::submit,
+        onNext = viewModel::next,
+        onBack = viewModel::back,
         onCancel = onCancel,
         onSetWeight = viewModel::setWeight,
         onSetLength = viewModel::setLength,
@@ -177,7 +184,8 @@ fun AddPackageScreen(
 @Composable
 private fun AddPackageScreenContent(
     state: AddPackageUiState,
-    onSubmit: () -> Unit,
+    onNext: () -> Unit,
+    onBack: () -> Unit,
     onCancel: () -> Unit,
     onSetWeight: (String) -> Unit,
     onSetLength: (String) -> Unit,
@@ -221,69 +229,95 @@ private fun AddPackageScreenContent(
         },
         bottomBar = {
             Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = onSubmit,
-                    enabled = !state.isSubmitting && !state.isLoading,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    if (state.isSubmitting) {
-                        CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
-                    } else {
-                        Text(stringResource(Res.string.package_submit))
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    if (state.step != AddPackageStep.Package) {
+                        OutlinedButton(
+                            onClick = onBack,
+                            enabled = !state.isSubmitting,
+                            modifier = Modifier.weight(1f),
+                        ) { Text(stringResource(Res.string.action_back)) }
+                    }
+                    Button(
+                        onClick = onNext,
+                        enabled = !state.isSubmitting && !state.isLoading,
+                        modifier = Modifier.weight(1f),
+                    ) {
+                        if (state.isSubmitting) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+                        } else {
+                            Text(
+                                if (state.step == AddPackageStep.Delivery) {
+                                    stringResource(Res.string.package_submit)
+                                } else {
+                                    stringResource(Res.string.action_next)
+                                },
+                            )
+                        }
                     }
                 }
             }
         },
     ) { padding ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Spacer(Modifier.height(4.dp))
-            if (state.isLoading) {
-                Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            StepProgressIndicator(
+                current = state.step,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
+            )
+            HorizontalDivider()
+            Column(
+                modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 16.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Spacer(Modifier.height(8.dp))
+                if (state.isLoading) {
+                    Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    when (state.step) {
+                        AddPackageStep.Package -> {
+                            DimensionsSection(state, onSetWeight, onSetLength, onSetWidth, onSetHeight)
+                            ImagesSection(state, onAddImages, onRemoveImage)
+                        }
+                        AddPackageStep.Sender -> CustomerFields(
+                            customer = state.sender,
+                            onNameChange = onSetSenderName,
+                            onPhoneChange = onSetSenderPhone,
+                            onCountryChange = onSetSenderCountry,
+                            onQueryChange = onSenderQueryChange,
+                            onPickAddress = onPickSenderAddress,
+                            onPickSuggestion = onPickSenderSuggestion,
+                        )
+                        AddPackageStep.Receiver -> CustomerFields(
+                            customer = state.receiver,
+                            onNameChange = onSetReceiverName,
+                            onPhoneChange = onSetReceiverPhone,
+                            onCountryChange = onSetReceiverCountry,
+                            onQueryChange = onReceiverQueryChange,
+                            onPickAddress = onPickReceiverAddress,
+                            onPickSuggestion = onPickReceiverSuggestion,
+                        )
+                        AddPackageStep.Delivery -> {
+                            OutlinedTextField(
+                                value = state.deliveryNotes,
+                                onValueChange = onSetDeliveryNotes,
+                                label = { Text(stringResource(Res.string.package_label_delivery_notes)) },
+                                modifier = Modifier.fillMaxWidth(),
+                                minLines = 2,
+                            )
+                            WarehouseSection(
+                                state = state,
+                                onSelectWarehouse = onSelectWarehouse,
+                                onStartAddWarehouse = onStartAddWarehouse,
+                                onSetWarehouseName = onSetWarehouseName,
+                                onWarehouseQueryChange = onWarehouseQueryChange,
+                                onPickWarehouseAddress = onPickWarehouseAddress,
+                            )
+                            ArrivalSection(state, onSetArrivalDate, onSetArrivalTime)
+                        }
+                    }
+                    Spacer(Modifier.height(16.dp))
                 }
-            } else {
-                DimensionsSection(state, onSetWeight, onSetLength, onSetWidth, onSetHeight)
-                ImagesSection(state, onAddImages, onRemoveImage)
-                SectionLabel(stringResource(Res.string.package_section_sender))
-                CustomerFields(
-                    customer = state.sender,
-                    onNameChange = onSetSenderName,
-                    onPhoneChange = onSetSenderPhone,
-                    onCountryChange = onSetSenderCountry,
-                    onQueryChange = onSenderQueryChange,
-                    onPickAddress = onPickSenderAddress,
-                    onPickSuggestion = onPickSenderSuggestion,
-                )
-                SectionLabel(stringResource(Res.string.package_section_receiver))
-                CustomerFields(
-                    customer = state.receiver,
-                    onNameChange = onSetReceiverName,
-                    onPhoneChange = onSetReceiverPhone,
-                    onCountryChange = onSetReceiverCountry,
-                    onQueryChange = onReceiverQueryChange,
-                    onPickAddress = onPickReceiverAddress,
-                    onPickSuggestion = onPickReceiverSuggestion,
-                )
-                OutlinedTextField(
-                    value = state.deliveryNotes,
-                    onValueChange = onSetDeliveryNotes,
-                    label = { Text(stringResource(Res.string.package_label_delivery_notes)) },
-                    modifier = Modifier.fillMaxWidth(),
-                    minLines = 2,
-                )
-                WarehouseSection(
-                    state = state,
-                    onSelectWarehouse = onSelectWarehouse,
-                    onStartAddWarehouse = onStartAddWarehouse,
-                    onSetWarehouseName = onSetWarehouseName,
-                    onWarehouseQueryChange = onWarehouseQueryChange,
-                    onPickWarehouseAddress = onPickWarehouseAddress,
-                )
-                ArrivalSection(state, onSetArrivalDate, onSetArrivalTime)
-                Spacer(Modifier.height(16.dp))
             }
         }
     }
@@ -295,7 +329,8 @@ private fun AddPackageScreenPreview() {
     HikyakuTheme {
         AddPackageScreenContent(
             state = AddPackageUiState(),
-            onSubmit = {},
+            onNext = {},
+            onBack = {},
             onCancel = {},
             onSetWeight = {},
             onSetLength = {},
@@ -316,6 +351,60 @@ private fun AddPackageScreenPreview() {
             onPickReceiverAddress = {},
             onPickReceiverSuggestion = {},
             onSetDeliveryNotes = {},
+            onSelectWarehouse = {},
+            onStartAddWarehouse = {},
+            onSetWarehouseName = {},
+            onWarehouseQueryChange = {},
+            onPickWarehouseAddress = {},
+            onSetArrivalDate = {},
+            onSetArrivalTime = { _, _ -> },
+        )
+    }
+}
+
+// SCRATCH: temporary visual-QA harness, deleted after manual verification.
+@Composable
+fun AddPackageScreenHarness() {
+    var state by remember { mutableStateOf(AddPackageUiState()) }
+    HikyakuTheme {
+        AddPackageScreenContent(
+            state = state,
+            onNext = {
+                state = when (state.step) {
+                    AddPackageStep.Package -> state.copy(step = AddPackageStep.Sender)
+                    AddPackageStep.Sender -> state.copy(step = AddPackageStep.Receiver)
+                    AddPackageStep.Receiver -> state.copy(step = AddPackageStep.Delivery)
+                    AddPackageStep.Delivery -> state
+                }
+            },
+            onBack = {
+                state = when (state.step) {
+                    AddPackageStep.Package -> state
+                    AddPackageStep.Sender -> state.copy(step = AddPackageStep.Package)
+                    AddPackageStep.Receiver -> state.copy(step = AddPackageStep.Sender)
+                    AddPackageStep.Delivery -> state.copy(step = AddPackageStep.Receiver)
+                }
+            },
+            onCancel = {},
+            onSetWeight = { state = state.copy(weight = it) },
+            onSetLength = { state = state.copy(length = it) },
+            onSetWidth = { state = state.copy(width = it) },
+            onSetHeight = { state = state.copy(height = it) },
+            onAddImages = {},
+            onRemoveImage = {},
+            onSetSenderName = { state = state.copy(sender = state.sender.copy(name = it)) },
+            onSetSenderPhone = { state = state.copy(sender = state.sender.copy(phone = it)) },
+            onSetSenderCountry = { state = state.copy(sender = state.sender.copy(countryIso = it)) },
+            onSenderQueryChange = {},
+            onPickSenderAddress = {},
+            onPickSenderSuggestion = {},
+            onSetReceiverName = { state = state.copy(receiver = state.receiver.copy(name = it)) },
+            onSetReceiverPhone = { state = state.copy(receiver = state.receiver.copy(phone = it)) },
+            onSetReceiverCountry = { state = state.copy(receiver = state.receiver.copy(countryIso = it)) },
+            onReceiverQueryChange = {},
+            onPickReceiverAddress = {},
+            onPickReceiverSuggestion = {},
+            onSetDeliveryNotes = { state = state.copy(deliveryNotes = it) },
             onSelectWarehouse = {},
             onStartAddWarehouse = {},
             onSetWarehouseName = {},
@@ -624,6 +713,105 @@ private fun SectionLabel(text: String) {
     Text(text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
 }
 
+// ---------------------------------------------------------------------------
+// Step progress header
+// ---------------------------------------------------------------------------
+
+private val wizardSteps = listOf(AddPackageStep.Package, AddPackageStep.Sender, AddPackageStep.Receiver, AddPackageStep.Delivery)
+
+@Composable
+private fun stepLabel(step: AddPackageStep): String = when (step) {
+    AddPackageStep.Package -> stringResource(Res.string.package_step_package)
+    AddPackageStep.Sender -> stringResource(Res.string.package_step_sender)
+    AddPackageStep.Receiver -> stringResource(Res.string.package_step_receiver)
+    AddPackageStep.Delivery -> stringResource(Res.string.package_step_delivery)
+}
+
+/**
+ * The horizontal stepper shown above the wizard body: numbered circles joined by connecting lines,
+ * with a label under each. Completed steps fill in (and show a check), the current step is
+ * highlighted, and upcoming steps stay muted. The connector between two steps fills once the left
+ * step is done, so progress "flows" left-to-right as the user advances.
+ */
+@Composable
+private fun StepProgressIndicator(current: AddPackageStep, modifier: Modifier = Modifier) {
+    val currentIndex = wizardSteps.indexOfFirst { it == current }.coerceAtLeast(0)
+    Row(modifier, verticalAlignment = Alignment.Top) {
+        wizardSteps.forEachIndexed { index, step ->
+            val completed = index < currentIndex
+            val active = index == currentIndex
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    StepConnector(visible = index > 0, filled = currentIndex >= index, modifier = Modifier.weight(1f))
+                    StepCircle(number = index + 1, completed = completed, active = active)
+                    StepConnector(
+                        visible = index < wizardSteps.lastIndex,
+                        filled = currentIndex > index,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = stepLabel(step),
+                    style = MaterialTheme.typography.labelMedium,
+                    textAlign = TextAlign.Center,
+                    fontWeight = if (active) FontWeight.SemiBold else FontWeight.Normal,
+                    color = if (active || completed) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun StepCircle(number: Int, completed: Boolean, active: Boolean) {
+    val background by animateColorAsState(
+        targetValue = if (completed || active) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.surfaceVariant
+        },
+        label = "stepCircleBackground",
+    )
+    val content = if (completed || active) {
+        MaterialTheme.colorScheme.onPrimary
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    Box(
+        modifier = Modifier.size(32.dp).clip(CircleShape).background(background),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = if (completed) "✓" else number.toString(),
+            color = content,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+        )
+    }
+}
+
+@Composable
+private fun StepConnector(visible: Boolean, filled: Boolean, modifier: Modifier = Modifier) {
+    val color by animateColorAsState(
+        targetValue = if (filled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+        label = "stepConnector",
+    )
+    Box(
+        modifier
+            .padding(horizontal = 4.dp)
+            .height(2.dp)
+            .clip(RoundedCornerShape(1.dp))
+            .then(if (visible) Modifier.background(color) else Modifier),
+    )
+}
 
 /**
  * Confirms the created package and, crucially, says what happened to it: `POST /api/v1/packages`

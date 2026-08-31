@@ -16,12 +16,4 @@
         <item quantity="one">%1$d package left</item>
         <item quantity="other">%1$d packages left</item>
     </plurals>
-    <plurals name="package_optimise_running_count">
-        <item quantity="one">Optimising %1$d package…</item>
-        <item quantity="other">Optimising %1$d packages…</item>
-    </plurals>
-    <plurals name="package_optimise_succeeded_count">
-        <item quantity="one">%1$d package assigned to a route.</item>
-        <item quantity="other">%1$d packages assigned to routes.</item>
-    </plurals>
 </resources>
