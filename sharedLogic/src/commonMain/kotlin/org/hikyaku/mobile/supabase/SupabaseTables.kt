@@ -21,6 +21,7 @@ object SupabaseTables {
     const val DRIVER_CURRENT_LOCATION = "driver_current_location"
     const val DRIVER_LOCATION_HISTORY = "driver_location_history"
     const val DRIVERS = "drivers"
+    const val DRIVER_VEHICLE_ASSIGNMENT = "driver_vehicle_assignment"
     const val VEHICLES = "vehicles"
     const val VEHICLE_TYPE = "vehicle_type"
     const val VEHICLE_MAINTENANCE = "vehicle_maintenance"

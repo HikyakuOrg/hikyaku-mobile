@@ -46,6 +46,7 @@ data class AddVehicleUiState(
  */
 class AddVehicleViewModel(
     private val orgId: String,
+    private val isPersonalOrg: Boolean,
     private val repository: VehicleRepository = VehicleRepository(),
 ) : ViewModel() {
 
@@ -149,7 +150,7 @@ class AddVehicleViewModel(
                 warehouseId = s.selectedWarehouseId!!,
                 images = s.images,
             )
-            repository.createVehicle(draft)
+            repository.createVehicle(draft, assignToSelf = isPersonalOrg)
                 .onSuccess { _state.value = _state.value.copy(isSubmitting = false, done = true) }
                 .onFailure {
                     _state.value = _state.value.copy(

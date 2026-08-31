@@ -78,8 +78,13 @@ class VehicleRepository(
     /**
      * Persists [draft] as a new `vehicles` row, then uploads any attached photos to
      * `vehicles/{id}/photo_{index}.jpg`. Returns the new vehicle's id.
+     *
+     * [assignToSelf] should be true in a personal org, where the signed-in user is the only
+     * possible driver: the instant-assignment engine only opens a shift for a driver+vehicle pair
+     * it finds in `driver_vehicle_assignment`, so without this a personal org's vehicles are never
+     * assignable, no matter how many are added.
      */
-    suspend fun createVehicle(draft: VehicleDraft): Result<String> = runCatching {
+    suspend fun createVehicle(draft: VehicleDraft, assignToSelf: Boolean = false): Result<String> = runCatching {
         val id = newId()
         client.postgrest.from(SupabaseTables.VEHICLES).insert(
             VehicleInsert(
@@ -96,7 +101,32 @@ class VehicleRepository(
             ),
         )
         draft.images.forEachIndexed { index, bytes -> uploadVehiclePhoto(id, index, bytes) }
+        if (assignToSelf) selfAssignDriver(draft.organisationId, draft.warehouseId, id)
         id
+    }
+
+    /**
+     * Pairs the signed-in user with [vehicleId] in `driver_vehicle_assignment`, creating their
+     * `drivers` row first if this is their first vehicle. Best-effort: swallows failures so a
+     * hiccup here doesn't undo an otherwise-successful vehicle creation, matching the existing
+     * `runCatching`-per-step style in this repository.
+     */
+    private suspend fun selfAssignDriver(organisationId: String, warehouseId: String, vehicleId: String) {
+        runCatching {
+            val userId = client.auth.currentUserOrNull()?.id ?: return@runCatching
+            val hasDriver = client.postgrest.from(SupabaseTables.DRIVERS)
+                .select(Columns.raw("id")) { filter { eq("id", userId) } }
+                .decodeList<DriverIdRow>()
+                .isNotEmpty()
+            if (!hasDriver) {
+                client.postgrest.from(SupabaseTables.DRIVERS).insert(
+                    DriverInsert(id = userId, organisationId = organisationId, warehouseId = warehouseId),
+                )
+            }
+            client.postgrest.from(SupabaseTables.DRIVER_VEHICLE_ASSIGNMENT).insert(
+                DriverVehicleAssignmentInsert(driverId = userId, vehicleId = vehicleId),
+            )
+        }
     }
 
     /** The single `vehicles` row for [vehicleId], for the vehicle detail screen's header. */
@@ -222,6 +252,22 @@ private data class WarehouseRow(
     val id: String,
     @SerialName("warehouse_name") val name: String,
     @SerialName("warehouse_address") val address: String,
+)
+
+@Serializable
+private data class DriverIdRow(val id: String)
+
+@Serializable
+private data class DriverInsert(
+    val id: String,
+    @SerialName("organisation_id") val organisationId: String,
+    @SerialName("warehouse_id") val warehouseId: String,
+)
+
+@Serializable
+private data class DriverVehicleAssignmentInsert(
+    @SerialName("driver_id") val driverId: String,
+    @SerialName("vehicle_id") val vehicleId: String,
 )
 
 @Serializable

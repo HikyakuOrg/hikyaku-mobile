@@ -295,7 +295,10 @@ fun MainNavGraph(
             }
             composable<AddVehicleRoute> { entry ->
                 val addVehicleViewModel: AddVehicleViewModel = viewModel {
-                    AddVehicleViewModel(orgId = homeState.selectedOrgId.orEmpty())
+                    AddVehicleViewModel(
+                        orgId = homeState.selectedOrgId.orEmpty(),
+                        isPersonalOrg = homeState.selectedOrganisation?.isPersonal == true,
+                    )
                 }
                 // Set by AddWarehouseRoute's onDone, so returning from a successful add refreshes the warehouse list.
                 val warehouseCreated by entry.savedStateHandle.getStateFlow(WAREHOUSE_CREATED_KEY, false).collectAsState()
