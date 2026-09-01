@@ -245,6 +245,9 @@
     <string name="package_detail_section_timeline">Status history</string>
     <string name="package_detail_no_timeline">No status updates yet.</string>
     <string name="package_detail_section_pod">Proof of delivery</string>
+    <string name="package_detail_delete_confirm_title">Delete this package?</string>
+    <string name="package_detail_delete_confirm_message">This permanently removes %1$s. This can\'t be undone.</string>
+    <string name="package_detail_delete_error">Couldn\'t delete this package.</string>
 
     <!-- Add package -->
     <string name="package_add_title">Add Package</string>

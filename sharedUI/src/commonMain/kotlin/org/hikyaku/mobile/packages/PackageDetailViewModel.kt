@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import hikyaku.sharedui.generated.resources.Res
 import hikyaku.sharedui.generated.resources.error_load_package
+import hikyaku.sharedui.generated.resources.package_detail_delete_error
 import io.github.jan.supabase.storage.StorageItem
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -24,6 +25,12 @@ data class PackageDetailUiState(
     val orgName: String = "",
     /** Public tracking-page URL for this package, null if the org slug wasn't available. */
     val trackingUrl: String? = null,
+    /** Whether this package can be deleted: a personal-org courier viewing their own PENDING/ASSIGNED package. */
+    val canDelete: Boolean = false,
+    val isDeleting: Boolean = false,
+    val deleteError: String? = null,
+    /** True once the delete has actually succeeded; the caller navigates away on this. */
+    val isDeleted: Boolean = false,
 )
 
 /**
@@ -34,6 +41,7 @@ class PackageDetailViewModel(
     private val trackingNumber: String,
     orgSlug: String = "",
     orgName: String = "",
+    private val isPersonalOrg: Boolean = false,
     private val repository: PackageRepository = PackageRepository(),
     environmentStore: EnvironmentStore = EnvironmentStore(),
 ) : ViewModel() {
@@ -57,7 +65,12 @@ class PackageDetailViewModel(
         viewModelScope.launch {
             repository.fetchPackageDetail(trackingNumber)
                 .onSuccess { detail ->
-                    _state.value = _state.value.copy(isLoading = false, detail = detail, error = null)
+                    _state.value = _state.value.copy(
+                        isLoading = false,
+                        detail = detail,
+                        error = null,
+                        canDelete = isPersonalOrg && detail.currentStatusEnum in DELETABLE_STATUSES,
+                    )
                     loadImages(detail.id)
                 }
                 .onFailure {
@@ -75,5 +88,36 @@ class PackageDetailViewModel(
             val images = repository.fetchPackageImages(packageId).getOrDefault(emptyList())
             _state.value = _state.value.copy(images = images)
         }
+    }
+
+    /**
+     * Deletes the package currently loaded. Gated by [PackageDetailUiState.canDelete] on the caller
+     * side, but re-checked here too since the button reflects the status at load time and a package
+     * can move past PENDING/ASSIGNED while the screen is open — RLS then refuses the delete and
+     * [PackageRepository.deletePackage] reports that as a failure rather than a silent no-op.
+     */
+    fun deletePackage() {
+        val s = _state.value
+        val detail = s.detail ?: return
+        if (!s.canDelete || s.isDeleting) return
+        _state.value = s.copy(isDeleting = true, deleteError = null)
+        viewModelScope.launch {
+            repository.deletePackage(detail.id)
+                .onSuccess { _state.value = _state.value.copy(isDeleting = false, isDeleted = true) }
+                .onFailure {
+                    _state.value = _state.value.copy(
+                        isDeleting = false,
+                        deleteError = it.message ?: getString(Res.string.package_detail_delete_error),
+                    )
+                }
+        }
+    }
+
+    fun dismissDeleteError() {
+        _state.value = _state.value.copy(deleteError = null)
+    }
+
+    private companion object {
+        val DELETABLE_STATUSES = setOf("PENDING", "ASSIGNED")
     }
 }

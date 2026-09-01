@@ -78,7 +78,10 @@ internal object WarehousesRoute
 @Serializable
 internal object AddWarehouseRoute
 
-/** [androidx.lifecycle.SavedStateHandle] key AddPackageRoute uses to signal PackagesRoute to refresh. */
+/**
+ * [androidx.lifecycle.SavedStateHandle] key used to signal PackagesRoute to refresh: set by
+ * AddPackageRoute on a successful create, and by PackageDetailRoute on a successful delete.
+ */
 private const val PACKAGE_CREATED_KEY = "package_created"
 
 /** [androidx.lifecycle.SavedStateHandle] key AddVehicleRoute uses to signal VehiclesRoute to refresh. */
@@ -227,14 +230,31 @@ fun MainNavGraph(
                 val trackingNumber = entry.toRoute<PackageDetailRoute>().trackingNumber
                 val orgSlug = homeState.selectedOrganisation?.slug ?: ""
                 val orgName = homeState.selectedOrganisation?.displayName ?: ""
+                val isPersonalOrg = homeState.selectedOrganisation?.isPersonal == true
                 val detailViewModel: PackageDetailViewModel = viewModel(key = trackingNumber) {
-                    PackageDetailViewModel(trackingNumber = trackingNumber, orgSlug = orgSlug, orgName = orgName)
+                    PackageDetailViewModel(
+                        trackingNumber = trackingNumber,
+                        orgSlug = orgSlug,
+                        orgName = orgName,
+                        isPersonalOrg = isPersonalOrg,
+                    )
                 }
                 val detailState by detailViewModel.state.collectAsState()
+                // A successful delete pops back to the list and asks it to refresh, the same signal
+                // AddPackageRoute's onDone sends — the list doesn't care whether an entry was added
+                // or removed, only that it's stale.
+                LaunchedEffect(detailState.isDeleted) {
+                    if (detailState.isDeleted) {
+                        navController.previousBackStackEntry?.savedStateHandle?.set(PACKAGE_CREATED_KEY, true)
+                        navController.popBackStack()
+                    }
+                }
                 PackageDetailScreen(
                     state = detailState,
                     onBack = { navController.popBackStack() },
                     onRetry = detailViewModel::load,
+                    onDeletePackage = detailViewModel::deletePackage,
+                    onDismissDeleteError = detailViewModel::dismissDeleteError,
                 )
             }
             composable<VehiclesRoute> { entry ->

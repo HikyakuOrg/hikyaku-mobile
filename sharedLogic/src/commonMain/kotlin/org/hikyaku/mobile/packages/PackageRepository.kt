@@ -185,6 +185,25 @@ class PackageRepository(
         result
     }
 
+    /**
+     * Deletes the package with [packageId]. RLS allows this only for a personal-org owner whose
+     * package is still PENDING or ASSIGNED (`packages delete personal owner`) — a refusal deletes
+     * zero rows without Postgrest treating that as an error, so `select("id")` asks for the deleted
+     * row back (`Prefer: return=representation`) and an empty response is turned into a real failure
+     * rather than a silent no-op success. Callers gate the delete option on status themselves; this
+     * only catches the package having moved on since the screen loaded.
+     */
+    suspend fun deletePackage(packageId: String): Result<Unit> = runCatching {
+        val result = client.postgrest.from(SupabaseTables.PACKAGES)
+            .delete {
+                select(Columns.raw("id"))
+                filter { eq("id", packageId) }
+            }
+        if (result.decodeList<IdRow>().isEmpty()) {
+            error("This package can no longer be deleted — it may have already moved past pending/assigned.")
+        }
+    }
+
     private suspend fun uploadImage(packageId: String, index: Int, bytes: ByteArray) {
         val path = "$packageId/photo_$index.jpg"
         client.storage.from(SupabaseBuckets.PACKAGES).upload(path, bytes) { upsert = true }

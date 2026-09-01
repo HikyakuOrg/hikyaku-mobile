@@ -21,9 +21,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
@@ -38,6 +40,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +56,9 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import hikyaku.sharedui.generated.resources.Res
 import hikyaku.sharedui.generated.resources.action_back
+import hikyaku.sharedui.generated.resources.action_cancel
+import hikyaku.sharedui.generated.resources.action_delete
+import hikyaku.sharedui.generated.resources.action_ok
 import hikyaku.sharedui.generated.resources.action_retry
 import hikyaku.sharedui.generated.resources.action_share
 import hikyaku.sharedui.generated.resources.cd_package_photo
@@ -57,6 +66,9 @@ import hikyaku.sharedui.generated.resources.cd_package_qr_code
 import hikyaku.sharedui.generated.resources.package_detail_actual_arrival
 import hikyaku.sharedui.generated.resources.package_detail_actual_departure
 import hikyaku.sharedui.generated.resources.package_detail_created
+import hikyaku.sharedui.generated.resources.package_detail_delete_confirm_message
+import hikyaku.sharedui.generated.resources.package_detail_delete_confirm_title
+import hikyaku.sharedui.generated.resources.package_detail_delete_error
 import hikyaku.sharedui.generated.resources.package_detail_dimensions_missing
 import hikyaku.sharedui.generated.resources.package_detail_from
 import hikyaku.sharedui.generated.resources.package_detail_label_size
@@ -101,9 +113,12 @@ fun PackageDetailScreen(
     state: PackageDetailUiState,
     onBack: () -> Unit,
     onRetry: () -> Unit,
+    onDeletePackage: () -> Unit = {},
+    onDismissDeleteError: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val shareText = rememberShareText()
+    var showDeleteConfirm by remember { mutableStateOf(false) }
     Scaffold(
         modifier = modifier,
         topBar = {
@@ -120,6 +135,15 @@ fun PackageDetailScreen(
                         val message = stringResource(Res.string.tracking_share_text, state.orgName, trackingUrl)
                         IconButton(onClick = { shareText(message) }) {
                             Icon(Icons.Filled.Share, contentDescription = stringResource(Res.string.action_share))
+                        }
+                    }
+                    if (state.canDelete) {
+                        IconButton(onClick = { showDeleteConfirm = true }, enabled = !state.isDeleting) {
+                            Icon(
+                                Icons.Filled.Delete,
+                                contentDescription = stringResource(Res.string.action_delete),
+                                tint = MaterialTheme.colorScheme.error,
+                            )
                         }
                     }
                 },
@@ -194,6 +218,41 @@ fun PackageDetailScreen(
                     }
                 }
             }
+        }
+        if (showDeleteConfirm) {
+            AlertDialog(
+                onDismissRequest = { showDeleteConfirm = false },
+                title = { Text(stringResource(Res.string.package_detail_delete_confirm_title)) },
+                text = {
+                    Text(
+                        stringResource(
+                            Res.string.package_detail_delete_confirm_message,
+                            state.detail?.trackingNumber.orEmpty(),
+                        ),
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = { showDeleteConfirm = false; onDeletePackage() }) {
+                        Text(stringResource(Res.string.action_delete))
+                    }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showDeleteConfirm = false }) {
+                        Text(stringResource(Res.string.action_cancel))
+                    }
+                },
+            )
+        }
+        val deleteError = state.deleteError
+        if (deleteError != null) {
+            AlertDialog(
+                onDismissRequest = onDismissDeleteError,
+                title = { Text(stringResource(Res.string.package_detail_delete_error)) },
+                text = { Text(deleteError) },
+                confirmButton = {
+                    TextButton(onClick = onDismissDeleteError) { Text(stringResource(Res.string.action_ok)) }
+                },
+            )
         }
     }
 }
