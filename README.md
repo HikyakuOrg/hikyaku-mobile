@@ -13,7 +13,7 @@ With the app, a driver can do these tasks:
 - Track a shift on a map, and share a tracking link with a customer.
 - Work alone, or as part of an organisation with other drivers and vehicles.
 
-Hikyaku connects to a Hikyaku server. The default server is `hikyaku.org`. A user can also
+Hikyaku connects to a Hikyaku server. The default server is `app.hikyaku.org`. A user can also
 point the app at a self-hosted server.
 
 ## Status

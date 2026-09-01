@@ -51,7 +51,7 @@ class EnvironmentViewModel(
         }
     }
 
-    /** Retries resolving the default hosted (hikyaku.org) environment. */
+    /** Retries resolving the default hosted (app.hikyaku.org) environment. */
     fun useDefault() = connect(EnvironmentSource.Default)
 
     /** Connects to a user-supplied self-hosted Hikyaku instance. */

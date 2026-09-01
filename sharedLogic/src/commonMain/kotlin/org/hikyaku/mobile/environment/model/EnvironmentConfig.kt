@@ -32,7 +32,7 @@ sealed class EnvironmentSource(val baseUrl: String) {
     }
 
     companion object {
-        const val DEFAULT_BASE_URL: String = "https://hikyaku.org"
+        const val DEFAULT_BASE_URL: String = "https://app.hikyaku.org"
     }
 }
 
