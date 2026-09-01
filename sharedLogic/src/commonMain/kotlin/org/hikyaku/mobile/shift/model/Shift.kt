@@ -47,15 +47,23 @@ data class Shift(
         }
 
     /**
-     * Each route's stops in travel order (start → jobs → end) as coordinates, used to draw a
-     * small route-shape preview on the home screen. A route with fewer than two located steps
-     * is dropped since it can't be drawn as a line.
+     * Each route's id and outbound stops (start → jobs, in travel order) as coordinates, used to
+     * fetch and draw the home-screen route preview map. The return-to-depot step is dropped since
+     * the preview only shows the outbound leg. A route with fewer than two located stops is
+     * dropped since it can't be drawn as a line.
      */
-    val routePaths: List<List<Point>>
-        get() = solutions.firstOrNull()?.routes.orEmpty()
-            .map { route -> route.steps.sortedBy { it.stepIndex }.mapNotNull { it.location } }
-            .filter { it.size >= 2 }
+    val routePreviewInputs: List<ShiftRoutePreviewInput>
+        get() = solutions.firstOrNull()?.routes.orEmpty().mapNotNull { route ->
+            val stops = route.steps
+                .filterNot { it.type.equals("end", ignoreCase = true) }
+                .sortedBy { it.stepIndex }
+                .mapNotNull { it.location }
+            if (stops.size >= 2) ShiftRoutePreviewInput(route.id, stops) else null
+        }
 }
+
+/** A route's id paired with its outbound stop coordinates, in travel order. */
+data class ShiftRoutePreviewInput(val routeId: String, val stops: List<Point>)
 
 /** The `vrp_solution` summary embedded alongside a [Shift]. */
 @Serializable
@@ -69,6 +77,7 @@ data class ShiftSolution(
 /** A `vrp_route` embedded alongside a [ShiftSolution], carrying just enough to draw its shape. */
 @Serializable
 data class ShiftRoute(
+    val id: String = "",
     @SerialName("vrp_route_step") val steps: List<ShiftRouteStep> = emptyList(),
 )
 

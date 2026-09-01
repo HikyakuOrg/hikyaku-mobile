@@ -107,6 +107,7 @@ fun MainNavGraph(
     val navController = rememberNavController()
     val homeState by viewModel.homeState.collectAsState()
     val shiftState by viewModel.shiftState.collectAsState()
+    val routePreviews by viewModel.routePreviews.collectAsState()
     val resumeSession by viewModel.resumeSession.collectAsState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -182,6 +183,7 @@ fun MainNavGraph(
                     user = user,
                     homeState = homeState,
                     shiftState = shiftState,
+                    routePreviews = routePreviews,
                     onOpenDrawer = { scope.launch { drawerState.open() } },
                     onSignOut = viewModel::signOut,
                     onRetryOrgs = viewModel::loadOrganisations,

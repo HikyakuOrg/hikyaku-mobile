@@ -28,7 +28,7 @@ class ShiftRepository(
                 Columns.raw(
                     "id, created_at, provider, scheduled_start, " +
                         "vrp_solution(routes_count, unassigned_count, duration, " +
-                        "vrp_route(vrp_route_step(step_index, type, location)))",
+                        "vrp_route(id, vrp_route_step(step_index, type, location)))",
                 ),
             ) {
                 filter { eq("organisation_id", orgId) }

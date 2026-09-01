@@ -228,12 +228,9 @@ import org.maplibre.spatialk.geojson.Position
 import kotlin.math.PI
 import kotlin.math.sin
 
-private const val MAP_STYLE_URL = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json"
-
-/** Outbound leg + stop markers (deep blue), return leg (amber), and depot marker (green). */
-private val ROUTE_OUTBOUND_COLOR = Color(0xFF19398D)
+/** Return leg colour (amber) — [MAP_STYLE_URL], [ROUTE_OUTBOUND_COLOR] and [DEPOT_COLOR] are
+ *  shared with the home-screen route preview via [RouteMapStyle.kt]. */
 private val ROUTE_RETURN_COLOR = Color(0xFFE8833A)
-private val DEPOT_COLOR = Color(0xFF2E7D32)
 
 /** Route-POI markers, kept distinct from the route/stop, return, and depot colours: fuel stations
  *  (purple) for motor vehicles, bicycle parking (teal) for bicycles. */

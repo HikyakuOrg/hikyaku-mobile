@@ -44,6 +44,7 @@ import org.hikyaku.mobile.invitation.model.Invitation
 import org.hikyaku.mobile.organisation.OrganisationRepository
 import org.hikyaku.mobile.organisation.model.Organisation
 import org.hikyaku.mobile.organisation.OrganisationStore
+import org.hikyaku.mobile.routing.RoutingRepository
 import org.hikyaku.mobile.shift.ShiftRepository
 import org.hikyaku.mobile.shift.model.Shift
 import org.hikyaku.mobile.shift.session.ShiftSessionStore
@@ -90,10 +91,18 @@ data class ShiftsUiState(
     val nonDeletableShiftIds: Set<String> = emptySet(),
 )
 
+/** Road-snapped route line for the home-screen preview map, keyed by `vrp_route` id. */
+data class RoutePreviewUiState(
+    val isLoading: Boolean = false,
+    /** `[longitude, latitude]` pairs; empty while loading or if the fetch failed. */
+    val coordinates: List<List<Double>> = emptyList(),
+)
+
 class AuthViewModel(
     private val repository: AuthRepository = AuthRepository(),
     private val organisationRepository: OrganisationRepository = OrganisationRepository(),
     private val shiftRepository: ShiftRepository = ShiftRepository(),
+    private val routingRepository: RoutingRepository = RoutingRepository(),
     private val invitationRepository: InvitationRepository = InvitationRepository(),
     private val organisationStore: OrganisationStore = OrganisationStore(),
     private val sessionStore: ShiftSessionStore = ShiftSessionStore(),
@@ -141,6 +150,10 @@ class AuthViewModel(
 
     private val _shiftState = MutableStateFlow(ShiftsUiState())
     val shiftState: StateFlow<ShiftsUiState> = _shiftState.asStateFlow()
+
+    /** Road-snapped route previews for the home screen, keyed by `vrp_route` id. */
+    private val _routePreviews = MutableStateFlow<Map<String, RoutePreviewUiState>>(emptyMap())
+    val routePreviews: StateFlow<Map<String, RoutePreviewUiState>> = _routePreviews.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -292,6 +305,7 @@ class AuthViewModel(
     /** Loads the shifts for [orgId], the organisation currently selected on the home screen. */
     fun loadShifts(orgId: String) {
         _shiftState.value = ShiftsUiState(isLoading = true, orgId = orgId)
+        _routePreviews.value = emptyMap()
         viewModelScope.launch { fetchShifts(orgId) }
     }
 
@@ -318,6 +332,7 @@ class AuthViewModel(
                     packageCounts = progress.mapValues { (_, p) -> p.total },
                     nonDeletableShiftIds = progress.filterValues { it.hasDelivered }.keys,
                 )
+                loadRoutePreviews(orgId, shifts)
             }
             .onFailure {
                 if (_shiftState.value.orgId != orgId) return@onFailure
@@ -327,6 +342,27 @@ class AuthViewModel(
                     error = it.message ?: getString(Res.string.error_load_shifts),
                 )
             }
+    }
+
+    /**
+     * Fetches the road-snapped route line for every route across [shifts] that isn't already
+     * cached in [routePreviews], so the home screen's preview map can show real roads instead of
+     * a straight line. Falls back to the straight-line stops (already reflected in
+     * [Shift.routePreviewInputs]) if a fetch fails, matching [org.hikyaku.mobile.shift.ShiftDetailViewModel].
+     */
+    private fun loadRoutePreviews(orgId: String, shifts: List<Shift>) {
+        val orgSlug = _homeState.value.organisations.firstOrNull { it.id == orgId }?.slug ?: return
+        val inputs = shifts.flatMap { it.routePreviewInputs }.filter { it.routeId !in _routePreviews.value }
+        inputs.forEach { input ->
+            _routePreviews.value = _routePreviews.value + (input.routeId to RoutePreviewUiState(isLoading = true))
+            viewModelScope.launch {
+                val stopCoords = input.stops.map { listOf(it.longitude, it.latitude) }
+                val preview = routingRepository.fetchRoutePreview("driving-car", orgSlug, stopCoords).getOrNull()
+                if (_shiftState.value.orgId != orgId) return@launch
+                val coordinates = preview?.coordinates?.takeIf { it.isNotEmpty() } ?: stopCoords
+                _routePreviews.value = _routePreviews.value + (input.routeId to RoutePreviewUiState(coordinates = coordinates))
+            }
+        }
     }
 
     /**

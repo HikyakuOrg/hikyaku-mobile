@@ -1,6 +1,5 @@
 package org.hikyaku.mobile
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -50,6 +49,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -59,8 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -97,18 +96,43 @@ import kotlinx.datetime.LocalDate
 import kotlinx.datetime.YearMonth
 import kotlinx.datetime.yearMonth
 import org.hikyaku.mobile.auth.HomeUiState
+import org.hikyaku.mobile.auth.RoutePreviewUiState
 import org.hikyaku.mobile.auth.ShiftsUiState
 import org.hikyaku.mobile.auth.model.AuthState
+import org.hikyaku.mobile.map.mapLayersSupported
 import org.hikyaku.mobile.organisation.model.Organisation
+import org.hikyaku.mobile.shift.DEPOT_COLOR
+import org.hikyaku.mobile.shift.MAP_STYLE_URL
+import org.hikyaku.mobile.shift.ROUTE_OUTBOUND_COLOR
 import org.hikyaku.mobile.shift.model.Shift
 import org.hikyaku.mobile.shift.model.ShiftRoute
+import org.hikyaku.mobile.shift.model.ShiftRoutePreviewInput
 import org.hikyaku.mobile.shift.model.ShiftRouteStep
 import org.hikyaku.mobile.shift.model.ShiftSolution
+import org.hikyaku.mobile.shift.routeMapOrnamentOptions
 import org.hikyaku.mobile.theme.HikyakuTheme
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.pluralStringResource
 import org.jetbrains.compose.resources.stringResource
+import org.maplibre.compose.camera.CameraPosition
+import org.maplibre.compose.camera.rememberCameraState
+import org.maplibre.compose.expressions.dsl.const
+import org.maplibre.compose.expressions.value.LineCap
+import org.maplibre.compose.expressions.value.LineJoin
+import org.maplibre.compose.layers.CircleLayer
+import org.maplibre.compose.layers.LineLayer
+import org.maplibre.compose.map.GestureOptions
+import org.maplibre.compose.map.MapOptions
+import org.maplibre.compose.map.MaplibreMap
+import org.maplibre.compose.sources.GeoJsonData
+import org.maplibre.compose.sources.rememberGeoJsonSource
+import org.maplibre.compose.style.BaseStyle
+import org.maplibre.spatialk.geojson.BoundingBox
+import org.maplibre.spatialk.geojson.Feature
+import org.maplibre.spatialk.geojson.FeatureCollection
+import org.maplibre.spatialk.geojson.LineString
 import org.maplibre.spatialk.geojson.Point
+import org.maplibre.spatialk.geojson.Position
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -116,6 +140,7 @@ fun HomeScreen(
     user: AuthState.Authenticated,
     homeState: HomeUiState,
     shiftState: ShiftsUiState,
+    routePreviews: Map<String, RoutePreviewUiState>,
     onOpenDrawer: () -> Unit,
     onSignOut: () -> Unit,
     onRetryOrgs: () -> Unit,
@@ -240,6 +265,7 @@ fun HomeScreen(
                         selectedDate = selectedDate,
                         completedShiftIds = shiftState.completedShiftIds,
                         packageCounts = shiftState.packageCounts,
+                        routePreviews = routePreviews,
                         canDeleteShifts = canDeleteShifts,
                         nonDeletableShiftIds = shiftState.nonDeletableShiftIds,
                         swipeGeneration = swipeGeneration,
@@ -356,6 +382,7 @@ private fun HomeScreenPreview() {
                 completedShiftIds = setOf("shift-2"),
                 packageCounts = mapOf("shift-1" to 12, "shift-2" to 6),
             ),
+            routePreviews = emptyMap(),
             onOpenDrawer = {},
             onSignOut = {},
             onRetryOrgs = {},
@@ -389,6 +416,7 @@ private fun HomeScreenEmptyPreview() {
                 orgId = "org-1",
                 completedShiftIds = emptySet(),
             ),
+            routePreviews = emptyMap(),
             onOpenDrawer = {},
             onSignOut = {},
             onRetryOrgs = {},
@@ -410,6 +438,7 @@ private fun LazyListScope.shiftListItems(
     selectedDate: LocalDate,
     completedShiftIds: Set<String>,
     packageCounts: Map<String, Int>,
+    routePreviews: Map<String, RoutePreviewUiState>,
     canDeleteShifts: Boolean,
     nonDeletableShiftIds: Set<String>,
     swipeGeneration: Map<String, Int>,
@@ -437,6 +466,7 @@ private fun LazyListScope.shiftListItems(
                     shift = shift,
                     isCompleted = shift.id in completedShiftIds,
                     packageCount = packageCounts[shift.id] ?: 0,
+                    routePreviews = routePreviews,
                     canDelete = canDeleteShifts,
                     isDeleteBlocked = shift.id in nonDeletableShiftIds,
                     onClick = { onShiftClick(shift.id) },
@@ -612,6 +642,7 @@ private fun DeletableShiftCard(
     shift: Shift,
     isCompleted: Boolean,
     packageCount: Int,
+    routePreviews: Map<String, RoutePreviewUiState>,
     canDelete: Boolean,
     isDeleteBlocked: Boolean,
     onClick: () -> Unit,
@@ -619,7 +650,7 @@ private fun DeletableShiftCard(
     onDeleteBlocked: () -> Unit,
 ) {
     if (!canDelete) {
-        ShiftCard(shift, isCompleted = isCompleted, packageCount = packageCount, onClick = onClick)
+        ShiftCard(shift, isCompleted = isCompleted, packageCount = packageCount, routePreviews = routePreviews, onClick = onClick)
         return
     }
     val dismissState = rememberSwipeToDismissBoxState()
@@ -654,12 +685,18 @@ private fun DeletableShiftCard(
             }
         },
     ) {
-        ShiftCard(shift, isCompleted = isCompleted, packageCount = packageCount, onClick = onClick)
+        ShiftCard(shift, isCompleted = isCompleted, packageCount = packageCount, routePreviews = routePreviews, onClick = onClick)
     }
 }
 
 @Composable
-private fun ShiftCard(shift: Shift, isCompleted: Boolean, packageCount: Int, onClick: () -> Unit) {
+private fun ShiftCard(
+    shift: Shift,
+    isCompleted: Boolean,
+    packageCount: Int,
+    routePreviews: Map<String, RoutePreviewUiState>,
+    onClick: () -> Unit,
+) {
     ElevatedCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)) {
         Column(Modifier.padding(16.dp)) {
             Row(
@@ -690,11 +727,13 @@ private fun ShiftCard(shift: Shift, isCompleted: Boolean, packageCount: Int, onC
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (shift.routePaths.isNotEmpty()) {
+            val previewInputs = shift.routePreviewInputs
+            if (previewInputs.isNotEmpty()) {
                 Spacer(Modifier.height(8.dp))
-                ShiftRoutePreview(
-                    routePaths = shift.routePaths,
-                    modifier = Modifier.fillMaxWidth().height(64.dp),
+                ShiftRouteMapPreview(
+                    previewInputs = previewInputs,
+                    routePreviews = routePreviews,
+                    modifier = Modifier.fillMaxWidth().height(240.dp),
                 )
             }
         }
@@ -721,49 +760,80 @@ private fun CompletedBadge() {
 }
 
 /**
- * A compact, non-interactive preview of a shift's route shape: each route's stops connected by
- * straight lines and scaled to fit the available space. This is not a real map (no streets or
- * tiles) — just a quick visual cue built from the same stop coordinates already loaded for the
- * stop count, so it stays cheap enough to render inline for every row in the list.
+ * A compact, non-interactive preview of a shift's route on a real map: each route's outbound leg
+ * (depot → last stop, no return) drawn as a road-snapped line once [routePreviews] resolves it,
+ * falling back to a straight line through the stops while that fetch is in flight or if it fails.
+ * Gestures are disabled since this is just a thumbnail — tap the card to open the full route.
  */
 @Composable
-private fun ShiftRoutePreview(routePaths: List<List<Point>>, modifier: Modifier = Modifier) {
-    val lineColor = MaterialTheme.colorScheme.primary
-    val stopColor = MaterialTheme.colorScheme.onSurfaceVariant
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-    ) {
-        Canvas(modifier = Modifier.fillMaxSize().padding(8.dp)) {
-            val allPoints = routePaths.flatten()
-            if (allPoints.isEmpty()) return@Canvas
-            val longitudes = allPoints.map { it.longitude }
-            val latitudes = allPoints.map { it.latitude }
-            val minLon = longitudes.min()
-            val minLat = latitudes.min()
-            val lonSpan = (longitudes.max() - minLon).takeIf { it > 0.0 } ?: 1.0
-            val latSpan = (latitudes.max() - minLat).takeIf { it > 0.0 } ?: 1.0
+private fun ShiftRouteMapPreview(
+    previewInputs: List<ShiftRoutePreviewInput>,
+    routePreviews: Map<String, RoutePreviewUiState>,
+    modifier: Modifier = Modifier,
+) {
+    val lines = previewInputs.map { input ->
+        routePreviews[input.routeId]?.coordinates?.takeIf { it.isNotEmpty() }
+            ?: input.stops.map { listOf(it.longitude, it.latitude) }
+    }
+    val allPositions = lines.flatten().map { Position(longitude = it[0], latitude = it[1]) }
+    if (allPositions.isEmpty()) return
 
-            fun project(point: Point): Offset {
-                val x = ((point.longitude - minLon) / lonSpan).toFloat() * size.width
-                // Latitude increases north but the y axis increases downward, so flip it.
-                val y = (1f - ((point.latitude - minLat) / latSpan).toFloat()) * size.height
-                return Offset(x, y)
-            }
+    val cameraState = rememberCameraState(
+        firstPosition = CameraPosition(target = allPositions.first(), zoom = 12.0),
+    )
+    LaunchedEffect(allPositions) {
+        val longitudes = allPositions.map { it.longitude }
+        val latitudes = allPositions.map { it.latitude }
+        val bounds = BoundingBox(
+            southwest = Position(longitude = longitudes.min(), latitude = latitudes.min()),
+            northeast = Position(longitude = longitudes.max(), latitude = latitudes.max()),
+        )
+        cameraState.animateTo(bounds, padding = PaddingValues(16.dp))
+    }
 
-            routePaths.forEach { path ->
-                val offsets = path.map(::project)
-                for (i in 0 until offsets.size - 1) {
-                    drawLine(
-                        color = lineColor,
-                        start = offsets[i],
-                        end = offsets[i + 1],
-                        strokeWidth = 3.dp.toPx(),
-                        cap = StrokeCap.Round,
+    Box(modifier = modifier.clip(RoundedCornerShape(8.dp))) {
+        MaplibreMap(
+            modifier = Modifier.matchParentSize(),
+            baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
+            cameraState = cameraState,
+            options = MapOptions(
+                gestureOptions = GestureOptions.AllDisabled,
+                ornamentOptions = routeMapOrnamentOptions(),
+            ),
+        ) {
+            // Desktop MapLibre Compose can't render sources/layers yet; show the base map only there.
+            if (mapLayersSupported) {
+                lines.forEachIndexed { index, line ->
+                    if (line.size < 2) return@forEachIndexed
+                    val source = rememberGeoJsonSource(
+                        GeoJsonData.Features(
+                            Feature(LineString(line.map { Position(longitude = it[0], latitude = it[1]) }), properties = null),
+                        ),
+                    )
+                    LineLayer(
+                        id = "home-route-line-$index",
+                        source = source,
+                        color = const(ROUTE_OUTBOUND_COLOR),
+                        width = const(3.dp),
+                        cap = const(LineCap.Round),
+                        join = const(LineJoin.Round),
                     )
                 }
-                offsets.forEach { offset -> drawCircle(color = stopColor, radius = 2.5.dp.toPx(), center = offset) }
+
+                val depotFeatures = previewInputs.mapNotNull { input ->
+                    input.stops.firstOrNull()?.let { Feature(Point(Position(longitude = it.longitude, latitude = it.latitude)), properties = null) }
+                }
+                if (depotFeatures.isNotEmpty()) {
+                    val depotSource = rememberGeoJsonSource(GeoJsonData.Features(FeatureCollection(depotFeatures)))
+                    CircleLayer(
+                        id = "home-route-depot",
+                        source = depotSource,
+                        color = const(DEPOT_COLOR),
+                        radius = const(5.dp),
+                        strokeColor = const(Color.White),
+                        strokeWidth = const(1.5.dp),
+                    )
+                }
             }
         }
     }
