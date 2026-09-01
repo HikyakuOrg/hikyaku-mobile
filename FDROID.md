@@ -264,7 +264,7 @@ See section 4 for the full list of secrets and variables.
 | `FDROID_REPO_NAME`, `FDROID_REPO_DESCRIPTION`, `FDROID_REPO_ICON` | Repository details shown in the client app. |
 | `FDROID_KEY_ALIAS`, `FDROID_KEY_DNAME` | Used once, when the key is made on the first start. A change after that has no effect. |
 | `FDROID_ARCHIVE_OLDER` | Recent versions to keep in the main repository; `0` keeps every version. |
-| `FDROID_SCAN_INTERVAL` | Seconds between checks of `data/repo/`. `0` runs one time and stops - this is what CI uses. |
+| `FDROID_SCAN_INTERVAL` | New APK files in `data/repo/` are picked up instantly via inotify; this only sets how often to poll `FDROID_S3_PULL_PREFIX` (S3 has no inotify equivalent), in seconds. `0` disables watching entirely and runs one time - this is what CI uses. |
 | `FDROID_MIRRORS` | Other addresses that hold a copy. Comma-separated. |
 
 ---

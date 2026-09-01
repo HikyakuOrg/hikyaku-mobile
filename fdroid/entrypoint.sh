@@ -159,10 +159,6 @@ fi
 # ---------------------------------------------------------------------------
 # Step 4 and 5 - index, sign, send to S3, then watch for new files.
 # ---------------------------------------------------------------------------
-snapshot() {
-    find "$DATA/repo" -maxdepth 1 -name '*.apk' -printf '%p %s %T@\n' 2>/dev/null \
-        | sort | sha256sum
-}
 
 # Build the rclone source, and the extra arguments, for the bucket.
 rclone_source() {
@@ -235,16 +231,33 @@ if [ "$FDROID_SCAN_INTERVAL" -le 0 ]; then
     exit 0
 fi
 
-log "Watching $DATA/repo every ${FDROID_SCAN_INTERVAL}s for new APK files."
-LAST=$(snapshot)
-while true; do
-    sleep "$FDROID_SCAN_INTERVAL"
-    pull_from_s3 || true
-    CURRENT=$(snapshot)
-    if [ "$CURRENT" != "$LAST" ]; then
-        log "A change was found in repo/."
-        if run_update; then
-            LAST="$CURRENT"
-        fi
-    fi
+# S3 has no inotify equivalent, so pulling from it stays on a timer. Files it
+# drops into repo/ still trigger the inotify watch below like any other file.
+if [ -n "$FDROID_S3_PULL_PREFIX" ]; then
+    (
+        while true; do
+            sleep "$FDROID_SCAN_INTERVAL"
+            pull_from_s3 || true
+        done
+    ) &
+    S3_POLL_PID=$!
+    trap 'kill "$S3_POLL_PID" 2>/dev/null || true' EXIT
+fi
+
+log "Watching $DATA/repo via inotify for new, changed or removed APK files."
+# No -r, and --include restricts events to *.apk: this watches repo/ itself
+# only, not the index files and icons/ that "fdroid update" writes into it,
+# or a reindex would trigger another reindex.
+inotifywait -m -q -e close_write,moved_to,moved_from,delete \
+    --include '\.apk$' --format '%f' "$DATA/repo" |
+while read -r _; do
+    # Debounce: a burst of events (several APKs landing at once, from CI or
+    # from the S3 pull above) becomes one reindex, not one per file.
+    while read -r -t 3 _; do :; done
+    log "A change was found in repo/."
+    run_update || true
+    # Drain events that the update itself just caused (e.g. archiving an old
+    # version out of repo/ when FDROID_ARCHIVE_OLDER is set), so they don't
+    # trigger an immediate extra pass.
+    while read -r -t 3 _; do :; done
 done

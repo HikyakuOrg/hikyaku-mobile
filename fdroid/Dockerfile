@@ -31,6 +31,7 @@ RUN set -eux; \
         rclone \
         git \
         gnupg \
+        inotify-tools \
         bash coreutils findutils \
         ca-certificates tzdata; \
     python3 -m venv /opt/venv; \
@@ -50,6 +51,7 @@ RUN set -eux; \
 RUN set -eux; \
     command -v keytool; \
     command -v jarsigner; \
+    command -v inotifywait; \
     rclone version | head -1; \
     apksigner --version; \
     fdroid --version
