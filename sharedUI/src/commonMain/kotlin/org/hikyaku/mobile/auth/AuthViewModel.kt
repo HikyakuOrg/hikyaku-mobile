@@ -41,6 +41,8 @@ import org.hikyaku.mobile.invitation.EmailNotVerifiedException
 import org.hikyaku.mobile.invitation.InvitationRepository
 import org.hikyaku.mobile.invitation.InvitationUnavailableException
 import org.hikyaku.mobile.invitation.model.Invitation
+import org.hikyaku.mobile.navigation.LastRoute
+import org.hikyaku.mobile.navigation.NavigationStateStore
 import org.hikyaku.mobile.organisation.OrganisationRepository
 import org.hikyaku.mobile.organisation.model.Organisation
 import org.hikyaku.mobile.organisation.OrganisationStore
@@ -106,6 +108,7 @@ class AuthViewModel(
     private val invitationRepository: InvitationRepository = InvitationRepository(),
     private val organisationStore: OrganisationStore = OrganisationStore(),
     private val sessionStore: ShiftSessionStore = ShiftSessionStore(),
+    private val navigationStateStore: NavigationStateStore = NavigationStateStore(),
 ) : ViewModel() {
 
     val authState: StateFlow<AuthState> = repository.authState.stateIn(
@@ -121,6 +124,14 @@ class AuthViewModel(
      */
     private val _resumeSession = MutableStateFlow<ShiftSession?>(null)
     val resumeSession: StateFlow<ShiftSession?> = _resumeSession.asStateFlow()
+
+    /**
+     * The screen the user was last on, loaded once when authenticated so a process death while
+     * backgrounded doesn't drop them back to Home. Cleared via [consumeInitialRoute] once
+     * navigation has happened.
+     */
+    private val _initialRoute = MutableStateFlow<LastRoute?>(null)
+    val initialRoute: StateFlow<LastRoute?> = _initialRoute.asStateFlow()
 
     private val _screenState = MutableStateFlow(AuthScreenState())
     val screenState: StateFlow<AuthScreenState> = _screenState.asStateFlow()
@@ -160,6 +171,8 @@ class AuthViewModel(
             authState.collect { state ->
                 _resumeSession.value =
                     if (state is AuthState.Authenticated) sessionStore.load()?.takeIf { it.isActive } else null
+                _initialRoute.value =
+                    if (state is AuthState.Authenticated) navigationStateStore.load() else null
                 if (state is AuthState.Authenticated) {
                     loadPendingInvitations()
                 } else {
@@ -172,6 +185,16 @@ class AuthViewModel(
     /** Clears the pending resume target after the app has navigated into the shift. */
     fun consumeResume() {
         _resumeSession.value = null
+    }
+
+    /** Clears the pending initial-route target after the app has navigated to it. */
+    fun consumeInitialRoute() {
+        _initialRoute.value = null
+    }
+
+    /** Records the screen now on top of the back stack, so it can be restored on next launch. */
+    fun saveLastRoute(route: LastRoute) {
+        navigationStateStore.save(route)
     }
 
     /**

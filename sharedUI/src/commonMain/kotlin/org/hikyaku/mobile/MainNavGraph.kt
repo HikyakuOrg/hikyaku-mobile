@@ -10,20 +10,21 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavBackStackEntry
+import androidx.navigation.NavDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.toRoute
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 import org.hikyaku.mobile.auth.AuthViewModel
 import org.hikyaku.mobile.auth.model.AuthState
+import org.hikyaku.mobile.navigation.LastRoute
 import org.hikyaku.mobile.packages.PackageDetailScreen
 import org.hikyaku.mobile.packages.PackageDetailViewModel
 import org.hikyaku.mobile.packages.PackagesScreen
@@ -112,15 +113,33 @@ fun MainNavGraph(
     val shiftState by viewModel.shiftState.collectAsState()
     val routePreviews by viewModel.routePreviews.collectAsState()
     val resumeSession by viewModel.resumeSession.collectAsState()
+    val initialRoute by viewModel.initialRoute.collectAsState()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val scope = rememberCoroutineScope()
-    var drawerDestination by remember { mutableStateOf(DrawerDestination.Home) }
+    // Derived from the actual back stack (rather than tracked separately) so it stays correct
+    // when the destination changes some way other than a drawer click, e.g. the system back button.
+    val currentBackStackEntry by navController.currentBackStackEntryAsState()
+    val drawerDestination = currentBackStackEntry?.toDrawerDestination() ?: DrawerDestination.Home
 
     // On cold start after a kill, jump straight back into an interrupted shift.
     LaunchedEffect(resumeSession) {
         val session = resumeSession ?: return@LaunchedEffect
         navController.navigate(ShiftDetailRoute(session.shiftId))
         viewModel.consumeResume()
+    }
+
+    // Remember whichever screen was on top, so a kill while backgrounded doesn't drop the
+    // user back to Home. ShiftDetailRoute is excluded here since resumeSession above already
+    // owns restoring into a shift.
+    LaunchedEffect(navController) {
+        navController.currentBackStackEntryFlow.collect { entry ->
+            entry.toLastRoute()?.let(viewModel::saveLastRoute)
+        }
+    }
+    LaunchedEffect(initialRoute) {
+        val route = initialRoute ?: return@LaunchedEffect
+        route.toNavRoute()?.let { navController.navigate(it) }
+        viewModel.consumeInitialRoute()
     }
 
     ModalNavigationDrawer(
@@ -131,7 +150,6 @@ fun MainNavGraph(
                 onHomeClick = {
                     scope.launch {
                         drawerState.close()
-                        drawerDestination = DrawerDestination.Home
                         navController.navigate(HomeRoute) {
                             popUpTo(HomeRoute) { inclusive = true }
                             launchSingleTop = true
@@ -141,7 +159,6 @@ fun MainNavGraph(
                 onPackagesClick = {
                     scope.launch {
                         drawerState.close()
-                        drawerDestination = DrawerDestination.Packages
                         navController.navigate(PackagesRoute) {
                             popUpTo(HomeRoute)
                             launchSingleTop = true
@@ -151,7 +168,6 @@ fun MainNavGraph(
                 onVehiclesClick = {
                     scope.launch {
                         drawerState.close()
-                        drawerDestination = DrawerDestination.Vehicles
                         navController.navigate(VehiclesRoute) {
                             popUpTo(HomeRoute)
                             launchSingleTop = true
@@ -161,7 +177,6 @@ fun MainNavGraph(
                 onWarehousesClick = {
                     scope.launch {
                         drawerState.close()
-                        drawerDestination = DrawerDestination.Warehouses
                         navController.navigate(WarehousesRoute) {
                             popUpTo(HomeRoute)
                             launchSingleTop = true
@@ -413,4 +428,65 @@ fun MainNavGraph(
             }
         }
     }
+}
+
+/**
+ * Matched by route pattern string rather than a type-checking API, since
+ * [NavDestination] only exposes a generic `hasRoute<T>()` helper on some targets (Android) but
+ * not others (desktop) in this KMP build of navigation-compose.
+ */
+private fun NavDestination.matchesRoute(qualifiedName: String?): Boolean = route == qualifiedName
+
+private fun NavDestination.matchesRouteWithArg(qualifiedName: String?): Boolean =
+    route?.startsWith(qualifiedName + "/") == true
+
+/**
+ * Maps the current back stack entry to a [LastRoute], or null for destinations that aren't
+ * restored this way.
+ */
+private fun NavBackStackEntry.toLastRoute(): LastRoute? = when {
+    destination.matchesRoute(HomeRoute::class.qualifiedName) -> LastRoute(LastRoute.Screen.Home)
+    destination.matchesRoute(PackagesRoute::class.qualifiedName) -> LastRoute(LastRoute.Screen.Packages)
+    destination.matchesRoute(AddPackageRoute::class.qualifiedName) -> LastRoute(LastRoute.Screen.AddPackage)
+    destination.matchesRouteWithArg(PackageDetailRoute::class.qualifiedName) ->
+        LastRoute(LastRoute.Screen.PackageDetail, toRoute<PackageDetailRoute>().trackingNumber)
+    destination.matchesRoute(VehiclesRoute::class.qualifiedName) -> LastRoute(LastRoute.Screen.Vehicles)
+    destination.matchesRoute(AddVehicleRoute::class.qualifiedName) -> LastRoute(LastRoute.Screen.AddVehicle)
+    destination.matchesRouteWithArg(VehicleDetailRoute::class.qualifiedName) ->
+        LastRoute(LastRoute.Screen.VehicleDetail, toRoute<VehicleDetailRoute>().vehicleId)
+    destination.matchesRouteWithArg(AddMaintenanceRoute::class.qualifiedName) ->
+        LastRoute(LastRoute.Screen.AddMaintenance, toRoute<AddMaintenanceRoute>().vehicleId)
+    destination.matchesRoute(WarehousesRoute::class.qualifiedName) -> LastRoute(LastRoute.Screen.Warehouses)
+    destination.matchesRoute(AddWarehouseRoute::class.qualifiedName) -> LastRoute(LastRoute.Screen.AddWarehouse)
+    // ShiftDetailRoute is intentionally excluded: the resumeSession flow above owns it.
+    else -> null
+}
+
+/** Which drawer section owns the current back stack entry, for highlighting the right item. */
+private fun NavBackStackEntry.toDrawerDestination(): DrawerDestination = when {
+    destination.matchesRoute(PackagesRoute::class.qualifiedName) -> DrawerDestination.Packages
+    destination.matchesRoute(AddPackageRoute::class.qualifiedName) -> DrawerDestination.Packages
+    destination.matchesRouteWithArg(PackageDetailRoute::class.qualifiedName) -> DrawerDestination.Packages
+    destination.matchesRoute(VehiclesRoute::class.qualifiedName) -> DrawerDestination.Vehicles
+    destination.matchesRoute(AddVehicleRoute::class.qualifiedName) -> DrawerDestination.Vehicles
+    destination.matchesRouteWithArg(VehicleDetailRoute::class.qualifiedName) -> DrawerDestination.Vehicles
+    destination.matchesRouteWithArg(AddMaintenanceRoute::class.qualifiedName) -> DrawerDestination.Vehicles
+    destination.matchesRoute(WarehousesRoute::class.qualifiedName) -> DrawerDestination.Warehouses
+    destination.matchesRoute(AddWarehouseRoute::class.qualifiedName) -> DrawerDestination.Warehouses
+    // HomeRoute and ShiftDetailRoute both belong to the Home section of the drawer.
+    else -> DrawerDestination.Home
+}
+
+/** Reverses [toLastRoute]; null for Home (the NavHost start destination — nothing to do). */
+private fun LastRoute.toNavRoute(): Any? = when (screen) {
+    LastRoute.Screen.Home -> null
+    LastRoute.Screen.Packages -> PackagesRoute
+    LastRoute.Screen.AddPackage -> AddPackageRoute
+    LastRoute.Screen.PackageDetail -> arg?.let(::PackageDetailRoute)
+    LastRoute.Screen.Vehicles -> VehiclesRoute
+    LastRoute.Screen.AddVehicle -> AddVehicleRoute
+    LastRoute.Screen.VehicleDetail -> arg?.let(::VehicleDetailRoute)
+    LastRoute.Screen.AddMaintenance -> arg?.let(::AddMaintenanceRoute)
+    LastRoute.Screen.Warehouses -> WarehousesRoute
+    LastRoute.Screen.AddWarehouse -> AddWarehouseRoute
 }
