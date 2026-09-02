@@ -1258,6 +1258,13 @@ private fun RouteMapView(
             RoutePoiKind.BicycleParking -> BicycleIcon
         },
     )
+    // `remember`ed so the SDF bitmap is built once and reused: this sits in the same composable
+    // scope as the route line's `flowGradient` calls below, which recompose ~60fps as [flowPhase]
+    // animates. An unmemoized `image(...)` call there hands the map a new image identity every
+    // frame, forcing it to reload the icon sprite continuously — visible as flicker on the marker.
+    val poiIconImage = remember(poiIconPainter) {
+        image(poiIconPainter, size = DpSize(16.dp, 16.dp), drawAsSdf = true)
+    }
     val poiFallbackName = stringResource(
         when (state.poiKind) {
             RoutePoiKind.Fuel -> Res.string.poi_fuel_station
@@ -1368,7 +1375,7 @@ private fun RouteMapView(
                 SymbolLayer(
                     id = "route-poi-icons",
                     source = poiSource,
-                    iconImage = image(poiIconPainter, size = DpSize(16.dp, 16.dp), drawAsSdf = true),
+                    iconImage = poiIconImage,
                     iconColor = const(Color.White),
                     iconAllowOverlap = const(true),
                     onClick = onPoiClick,
