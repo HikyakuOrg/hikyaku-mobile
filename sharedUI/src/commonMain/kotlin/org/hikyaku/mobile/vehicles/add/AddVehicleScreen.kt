@@ -38,6 +38,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -59,6 +60,7 @@ import hikyaku.sharedui.generated.resources.action_back
 import hikyaku.sharedui.generated.resources.action_remove
 import hikyaku.sharedui.generated.resources.cd_vehicle_photo
 import hikyaku.sharedui.generated.resources.vehicle_action_choose_photos
+import hikyaku.sharedui.generated.resources.vehicle_action_scan_vin
 import hikyaku.sharedui.generated.resources.vehicle_action_take_photo
 import hikyaku.sharedui.generated.resources.vehicle_add_title
 import hikyaku.sharedui.generated.resources.vehicle_add_warehouse_cta
@@ -80,6 +82,8 @@ import org.hikyaku.mobile.theme.HikyakuTheme
 import org.hikyaku.mobile.toast.ToastEffect
 import org.hikyaku.mobile.vehicles.model.VehicleTypeOption
 import org.hikyaku.mobile.vehicles.model.VehicleWarehouseOption
+import org.hikyaku.mobile.vehicles.scan.ScanVinOverlay
+import org.hikyaku.mobile.vehicles.scan.vinScanningSupported
 import org.jetbrains.compose.resources.stringResource
 
 /**
@@ -208,13 +212,7 @@ private fun AddVehicleScreenContent(
                         modifier = Modifier.weight(1f),
                     )
                 }
-                OutlinedTextField(
-                    value = state.vin,
-                    onValueChange = onSetVin,
-                    label = { Text(stringResource(Res.string.vehicle_label_vin)) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                )
+                VinField(value = state.vin, onValueChange = onSetVin)
                 OutlinedTextField(
                     value = state.grossLimits,
                     onValueChange = onSetGrossLimits,
@@ -275,6 +273,42 @@ private fun AddVehicleScreenPreview() {
             onSelectWarehouse = {},
             onAddImages = {},
             onRemoveImage = {},
+        )
+    }
+}
+
+/**
+ * The VIN field plus its scan affordance.
+ *
+ * The scanner is a full-screen [ScanVinOverlay] dialog, so whether it is open is pure view state:
+ * it needs no route, no entry on [AddVehicleUiState] and no change to
+ * [AddVehicleScreenContent]'s parameters, which keeps the preview below working unchanged. Hidden
+ * entirely where [vinScanningSupported] is false, leaving plain text entry on desktop.
+ */
+@Composable
+private fun VinField(value: String, onValueChange: (String) -> Unit) {
+    var scanning by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(stringResource(Res.string.vehicle_label_vin)) },
+        singleLine = true,
+        trailingIcon = {
+            if (vinScanningSupported) {
+                TextButton(onClick = { scanning = true }) {
+                    Text(stringResource(Res.string.vehicle_action_scan_vin))
+                }
+            }
+        },
+        modifier = Modifier.fillMaxWidth(),
+    )
+    if (scanning) {
+        ScanVinOverlay(
+            onClose = { scanning = false },
+            onVinRecognised = { vin ->
+                onValueChange(vin)
+                scanning = false
+            },
         )
     }
 }

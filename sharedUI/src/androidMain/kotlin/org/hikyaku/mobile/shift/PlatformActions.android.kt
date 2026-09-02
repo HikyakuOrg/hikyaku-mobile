@@ -11,6 +11,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
@@ -226,3 +229,31 @@ actual fun rememberImagePicker(onResult: (List<ByteArray>) -> Unit): () -> Unit 
         launcher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
     }
 }
+
+@Composable
+actual fun rememberCameraPermission(): CameraPermissionState {
+    val context = LocalContext.current
+    val state = remember { AndroidCameraPermissionState(hasCameraPermission(context)) }
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { isGranted ->
+        state.granted = isGranted
+        state.denied = !isGranted
+    }
+    SideEffect { state.onRequest = { launcher.launch(Manifest.permission.CAMERA) } }
+    return state
+}
+
+private class AndroidCameraPermissionState(granted: Boolean) : CameraPermissionState {
+    override var granted: Boolean by mutableStateOf(granted)
+    override var denied: Boolean by mutableStateOf(false)
+
+    /** Set once the launcher exists; named apart from [request] to avoid shadowing it. */
+    var onRequest: () -> Unit = {}
+
+    override fun request() = onRequest()
+}
+
+private fun hasCameraPermission(context: Context): Boolean =
+    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
+        PackageManager.PERMISSION_GRANTED

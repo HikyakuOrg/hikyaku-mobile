@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        qr-kit's AAR manifest declares android:name="org.qrcodeScanner.QRKitApp" as the
+        Application class, but that class is compiled into the AAR's default package rather
+        than org.qrcodeScanner, so it can never be found at the declared name. androidApp works
+        around this with the same tools:replace; this self-contained instrumented-test APK needs
+        its own copy since it merges qr-kit's manifest directly with no app manifest to override it.
+    -->
+    <application
+        android:name="android.app.Application"
+        tools:replace="android:name" />
+
+</manifest>

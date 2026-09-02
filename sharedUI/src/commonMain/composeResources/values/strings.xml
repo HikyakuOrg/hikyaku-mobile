@@ -308,6 +308,7 @@
     <string name="vehicle_label_make">Make</string>
     <string name="vehicle_label_plate">Plate</string>
     <string name="vehicle_label_vin">VIN</string>
+    <string name="vehicle_action_scan_vin">Scan</string>
     <string name="vehicle_label_year">Year</string>
     <string name="vehicle_label_gross_limits">Gross weight limit (kg)</string>
     <string name="vehicle_section_type">Vehicle type</string>
@@ -322,6 +323,22 @@
     <string name="vehicle_error_choose_type">Choose a vehicle type.</string>
     <string name="vehicle_error_choose_warehouse">Choose a home warehouse.</string>
     <string name="vehicle_error_submit_failed">Couldn't create the vehicle.</string>
+    <!-- Scan VIN -->
+    <string name="vin_scan_title">Scan VIN</string>
+    <string name="vin_scan_instruction">Point the camera at the VIN plate or sticker. It is usually on the door frame, the dashboard or the chassis.</string>
+    <string name="vin_scan_choose_image">Choose an image</string>
+    <string name="vin_scan_torch">Flashlight</string>
+    <string name="vin_scan_preparing">Getting the scanner ready…</string>
+    <string name="vin_scan_analyzing">Reading the image…</string>
+    <string name="vin_scan_found">Found %1$s</string>
+    <string name="vin_scan_found_ai">Read by on-device AI: %1$s. Please check it against the label.</string>
+    <string name="vin_scan_not_found">No VIN found. Try again, or move closer to the label.</string>
+    <string name="vin_scan_failed">Couldn't read that image.</string>
+    <string name="vin_scan_camera_permission">Camera access is needed to scan a VIN.</string>
+    <string name="vin_scan_camera_unavailable">VIN scanning isn't available on this device. Type the VIN instead.</string>
+    <string name="cd_vin_scan_close">Close VIN scanner</string>
+    <string name="action_grant_permission">Allow</string>
+
     <string name="vehicle_no_warehouses_title">No warehouses yet</string>
     <string name="vehicle_no_warehouses_body">Add a warehouse before adding a vehicle.</string>
     <string name="vehicle_add_warehouse_cta">Add a warehouse</string>

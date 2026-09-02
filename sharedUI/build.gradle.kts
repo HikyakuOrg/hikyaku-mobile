@@ -25,6 +25,13 @@ kotlin {
        withHostTest {
            isIncludeAndroidResources = true
        }
+       // The repo's first instrumented tests. The ML Kit recognisers can only be exercised
+       // against real JPEGs on a real device, not on the JVM. The source-set tree is left unset
+       // on purpose so commonTest is not dragged onto the device and re-run there.
+       withDeviceTest {
+           instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+           animationsDisabled = true
+       }
     }
     
     sourceSets {
@@ -50,6 +57,25 @@ kotlin {
             implementation(libs.mlkit.genai.imageDescription)
             implementation(libs.mlkit.genai.proofreading)
             implementation(libs.kotlinx.coroutinesGuava)
+            // CameraX drives the in-app VIN scanner's viewfinder and frame analysis. qr-kit
+            // already pulls these in, but only at <scope>runtime</scope>, so they are absent
+            // from the compile classpath and must be declared here.
+            implementation(libs.androidx.camera.core)
+            implementation(libs.androidx.camera.camera2)
+            implementation(libs.androidx.camera.lifecycle)
+            implementation(libs.androidx.camera.view)
+            // ML Kit Vision for VIN recognition, via the UNBUNDLED (Play Services) path: the
+            // OCR and barcode models live in Play Services rather than the APK, keeping ~28 MB
+            // of bundled model out of the build. Inference is on-device once they are installed.
+            implementation(libs.playServices.mlkit.textRecognition)
+            implementation(libs.playServices.mlkit.barcodeScanning)
+            // Last-resort multimodal read for a still image whose OCR and barcode both come up
+            // empty; the actual for `expect fun rememberVinScanner`'s fallback. Gated on
+            // checkStatus(), so it stays dormant on any build without AICore.
+            implementation(libs.mlkit.genai.prompt)
+            // ML Kit Vision and CameraX hand back Play Services Tasks; coroutines-guava above
+            // covers the ListenableFuture side. Both bridges are needed for .await().
+            implementation(libs.kotlinx.coroutinesPlayServices)
         }
         jvmMain.dependencies {
             // Phone-number validation/formatting; the actual for `expect object PhoneNumbers`.
@@ -89,6 +115,12 @@ kotlin {
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
+        }
+        getByName("androidDeviceTest").dependencies {
+            implementation(libs.kotlin.test)
+            implementation(libs.androidx.testExt.junit)
+            implementation(libs.androidx.test.runner)
+            implementation(libs.androidx.test.core)
         }
     }
 }

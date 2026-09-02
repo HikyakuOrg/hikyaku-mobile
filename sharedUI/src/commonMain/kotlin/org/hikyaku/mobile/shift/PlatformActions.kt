@@ -1,6 +1,7 @@
 package org.hikyaku.mobile.shift
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
 import org.maplibre.compose.location.LocationProvider
 
 /**
@@ -53,3 +54,25 @@ expect fun rememberImagePicker(onResult: (List<ByteArray>) -> Unit): () -> Unit
  */
 @Composable
 expect fun rememberShiftLocationProvider(): LocationProvider
+
+/** The CAMERA runtime grant, plus a launcher for requesting it. */
+@Stable
+interface CameraPermissionState {
+    val granted: Boolean
+
+    /** Asked at least once this session and refused, so it is time to offer the settings page. */
+    val denied: Boolean
+
+    fun request()
+}
+
+/**
+ * Tracks and requests the CAMERA runtime permission for the add-vehicle VIN scanner.
+ *
+ * The manifest entry has been there since the load-scanning QR scanner shipped, but nothing in the
+ * app has ever requested it: QRKit asks internally, on its own. The VIN scanner drives CameraX
+ * directly, so it has to ask for itself. Off Android there is no permission model, so [granted] is
+ * false and [request] does nothing.
+ */
+@Composable
+expect fun rememberCameraPermission(): CameraPermissionState

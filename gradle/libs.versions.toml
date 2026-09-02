@@ -5,6 +5,7 @@ android-minSdk = "26"
 android-targetSdk = "36"
 androidx-activity = "1.13.0"
 androidx-appcompat = "1.7.1"
+androidx-camera = "1.4.2"
 androidx-core = "1.16.0"
 androidx-credentials = "1.6.0"
 androidx-startup = "1.2.0"
@@ -12,6 +13,7 @@ androidx-espresso = "3.7.0"
 androidx-exifinterface = "1.4.2"
 androidx-lifecycle = "2.11.0-beta01"
 androidx-print = "1.1.0"
+androidx-test = "1.7.0"
 androidx-testExt = "1.3.0"
 androidx-work = "2.11.2"
 coil = "3.2.0"
@@ -29,10 +31,13 @@ ktor = "3.4.3"
 maplibre-compose = "0.13.0"
 material3 = "1.11.0-alpha07"
 mlkitGenai = "1.0.0-beta1"
+mlkitGenaiPrompt = "1.0.0-beta2"
 multiplatform-settings = "1.3.0"
 navigation-compose = "2.9.0-beta03"
 openApiGenerator = "7.11.0"
 play-services-location = "21.3.0"
+playServicesMlkitBarcodeScanning = "18.3.1"
+playServicesMlkitTextRecognition = "19.0.1"
 qr-kit = "3.1.3"
 spatialk = "0.7.0"
 supabase = "3.6.0"
@@ -45,6 +50,8 @@ kotlin-testJunit = { module = "org.jetbrains.kotlin:kotlin-test-junit", version.
 junit = { module = "junit:junit", version.ref = "junit" }
 libphonenumber = { module = "com.googlecode.libphonenumber:libphonenumber", version.ref = "libphonenumber" }
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
+androidx-test-core = { module = "androidx.test:core", version.ref = "androidx-test" }
+androidx-test-runner = { module = "androidx.test:runner", version.ref = "androidx-test" }
 androidx-testExt-junit = { module = "androidx.test.ext:junit", version.ref = "androidx-testExt" }
 androidx-espresso-core = { module = "androidx.test.espresso:espresso-core", version.ref = "androidx-espresso" }
 androidx-appcompat = { module = "androidx.appcompat:appcompat", version.ref = "androidx-appcompat" }
@@ -55,6 +62,10 @@ androidx-print = { module = "androidx.print:print", version.ref = "androidx-prin
 androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "androidx-credentials" }
 androidx-credentials-playServicesAuth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "androidx-credentials" }
 androidx-exifinterface = { module = "androidx.exifinterface:exifinterface", version.ref = "androidx-exifinterface" }
+androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "androidx-camera" }
+androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "androidx-camera" }
+androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "androidx-camera" }
+androidx-camera-view = { module = "androidx.camera:camera-view", version.ref = "androidx-camera" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 calendar-composeMultiplatform = { module = "com.kizitonwose.calendar:compose-multiplatform", version.ref = "calendar" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version.ref = "coil" }
@@ -83,9 +94,12 @@ maplibre-compose = { module = "org.maplibre.compose:maplibre-compose", version.r
 maplibre-native-bindings-jni = { module = "org.maplibre.compose:maplibre-native-bindings-jni", version.ref = "maplibre-compose" }
 mlkit-genai-imageDescription = { module = "com.google.mlkit:genai-image-description", version.ref = "mlkitGenai" }
 mlkit-genai-proofreading = { module = "com.google.mlkit:genai-proofreading", version.ref = "mlkitGenai" }
+mlkit-genai-prompt = { module = "com.google.mlkit:genai-prompt", version.ref = "mlkitGenaiPrompt" }
 spatialk-geojson = { module = "org.maplibre.spatialk:geojson", version.ref = "spatialk" }
 multiplatform-settings = { module = "com.russhwolf:multiplatform-settings-no-arg", version.ref = "multiplatform-settings" }
 play-services-location = { module = "com.google.android.gms:play-services-location", version.ref = "play-services-location" }
+playServices-mlkit-textRecognition = { module = "com.google.android.gms:play-services-mlkit-text-recognition", version.ref = "playServicesMlkitTextRecognition" }
+playServices-mlkit-barcodeScanning = { module = "com.google.android.gms:play-services-mlkit-barcode-scanning", version.ref = "playServicesMlkitBarcodeScanning" }
 qr-kit = { module = "network.chaintech:qr-kit", version.ref = "qr-kit" }
 androidx-navigation-compose = { module = "org.jetbrains.androidx.navigation:navigation-compose", version.ref = "navigation-compose" }
 supabase-bom = { module = "io.github.jan-tennert.supabase:bom", version.ref = "supabase" }

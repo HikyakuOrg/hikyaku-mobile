@@ -31,3 +31,13 @@ actual fun rememberImagePicker(onResult: (List<ByteArray>) -> Unit): () -> Unit 
 /** Desktop has no location API; the puck never appears. */
 @Composable
 actual fun rememberShiftLocationProvider(): LocationProvider = rememberNullLocationProvider()
+
+/** Desktop has no runtime permission model, and no camera to grant access to. */
+@Composable
+actual fun rememberCameraPermission(): CameraPermissionState = DesktopCameraPermission
+
+private object DesktopCameraPermission : CameraPermissionState {
+    override val granted: Boolean = false
+    override val denied: Boolean = false
+    override fun request() = Unit
+}
