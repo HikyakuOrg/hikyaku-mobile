@@ -246,8 +246,8 @@
     <string name="package_detail_no_timeline">No status updates yet.</string>
     <string name="package_detail_section_pod">Proof of delivery</string>
     <string name="package_detail_delete_confirm_title">Delete this package?</string>
-    <string name="package_detail_delete_confirm_message">This permanently removes %1$s. This can\'t be undone.</string>
-    <string name="package_detail_delete_error">Couldn\'t delete this package.</string>
+    <string name="package_detail_delete_confirm_message">This permanently removes %1$s. This can't be undone.</string>
+    <string name="package_detail_delete_error">Couldn't delete this package.</string>
 
     <!-- Add package -->
     <string name="package_add_title">Add Package</string>
@@ -288,13 +288,13 @@
     <string name="package_outcome_assigned_eta">Added to a shift today, stop %1$s, arriving about %2$s.</string>
     <string name="package_outcome_new_shift">A new shift was opened for it, stop %1$s.</string>
     <string name="package_outcome_new_shift_eta">A new shift was opened for it, stop %1$s, arriving about %2$s.</string>
-    <string name="package_outcome_deferred">Queued. It isn\'t on a shift yet.</string>
+    <string name="package_outcome_deferred">Queued. It isn't on a shift yet.</string>
     <string name="package_outcome_skipped">Not added to a shift.</string>
-    <string name="package_outcome_reason_no_capacity">Today\'s shifts are full.</string>
+    <string name="package_outcome_reason_no_capacity">Today's shifts are full.</string>
     <string name="package_outcome_reason_no_driver">No driver and vehicle are free today.</string>
-    <string name="package_outcome_reason_allowance">This month\'s shift allowance is used up.</string>
-    <string name="package_outcome_reason_no_geocode">The delivery address couldn\'t be placed on the map.</string>
-    <string name="package_outcome_reason_auto_assign">You\'ll add it to a shift yourself.</string>
+    <string name="package_outcome_reason_allowance">This month's shift allowance is used up.</string>
+    <string name="package_outcome_reason_no_geocode">The delivery address couldn't be placed on the map.</string>
+    <string name="package_outcome_reason_auto_assign">You'll add it to a shift yourself.</string>
     <string name="package_outcome_reason_deadline">No shift today can reach it by its deadline.</string>
     <string name="package_outcome_evicted">%1$s other package(s) moved to another shift to make room.</string>
 

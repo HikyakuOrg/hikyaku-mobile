@@ -31,6 +31,18 @@ Adding or editing an entry in `sharedUI/src/commonMain/composeResources/values/s
 
 So after adding a string, compile once, then add both the string usage and its import.
 
+Apostrophes in string values do not need escaping — write them literally.
+
+```
+<string name="dont_example">don't</string>
+```
+
+Not:
+
+```
+<string name="dont_example">don\'t</string>
+```
+
 ### Code Intelligence
 
 Prefer LSP over Grep/Read for code navigation — it's faster, precise, and avoids reading entire files:
