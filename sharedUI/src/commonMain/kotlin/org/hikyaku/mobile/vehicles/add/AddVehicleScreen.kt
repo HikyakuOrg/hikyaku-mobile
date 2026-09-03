@@ -191,7 +191,7 @@ private fun AddVehicleScreenContent(
                     onValueChange = onSetModel,
                     label = { Text(stringResource(Res.string.vehicle_label_model)) },
                     singleLine = true,
-                    readOnly = state.isModelReadOnly,
+                    enabled = !state.isModelReadOnly,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
@@ -199,7 +199,7 @@ private fun AddVehicleScreenContent(
                     onValueChange = onSetMake,
                     label = { Text(stringResource(Res.string.vehicle_label_make)) },
                     singleLine = true,
-                    readOnly = state.isMakeReadOnly,
+                    enabled = !state.isMakeReadOnly,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -215,7 +215,7 @@ private fun AddVehicleScreenContent(
                         onValueChange = onSetYear,
                         label = { Text(stringResource(Res.string.vehicle_label_year)) },
                         singleLine = true,
-                        readOnly = state.isYearReadOnly,
+                        enabled = !state.isYearReadOnly,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
                     )
