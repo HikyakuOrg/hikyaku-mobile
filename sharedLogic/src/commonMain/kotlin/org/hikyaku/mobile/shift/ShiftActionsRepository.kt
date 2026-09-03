@@ -25,7 +25,8 @@ import org.hikyaku.mobile.supabase.SupabaseTables
  * so these calls fail for a route that isn't the signed-in driver's.
  *
  * Location is upserted into `driver_current_location` (the only table in the `supabase_realtime`
- * publication, hence the dashboard's live feed) and appended to `driver_location_history`.
+ * publication, hence the dashboard's live feed); a database trigger on that table mirrors each
+ * write into `driver_location_history`.
  */
 class ShiftActionsRepository(
     private val client: SupabaseClient = SupabaseClientProvider.client,
@@ -62,17 +63,21 @@ class ShiftActionsRepository(
     }
 
     /**
-     * Upserts the driver's live position and appends it to the breadcrumb history. PostGIS
-     * geometry columns accept EWKT, so the point is sent as `SRID=4326;POINT(lng lat)` text and
-     * cast on insert. The row is keyed by `driver_id`, which RLS requires to equal `auth.uid()`.
+     * Upserts the driver's live position. PostGIS geometry columns accept EWKT, so the point is
+     * sent as `SRID=4326;POINT(lng lat)` text and cast on insert. The row is keyed by
+     * `driver_id`, which RLS requires to equal `auth.uid()`.
+     *
+     * The breadcrumb row in `driver_location_history` is appended by the table's
+     * `log_driver_location_history` trigger, not from here: the trigger fires for every writer
+     * (this app, the web dashboard, the API), it can't be skipped by a process death between two
+     * requests, and it drops an update that doesn't move the point. A second insert from here
+     * would simply duplicate every breadcrumb.
      */
     suspend fun updateLocation(lat: Double, lng: Double, speed: Double? = null): Result<Unit> = runCatching {
         val driverId = client.auth.currentUserOrNull()?.id ?: error("No authenticated user.")
         val point = "SRID=4326;POINT($lng $lat)"
         client.postgrest.from(SupabaseTables.DRIVER_CURRENT_LOCATION)
             .upsert(DriverLocationUpsert(driverId, point, speed)) { onConflict = "driver_id" }
-        client.postgrest.from(SupabaseTables.DRIVER_LOCATION_HISTORY)
-            .insert(DriverLocationHistoryInsert(driverId, point))
         Unit
     }
 
@@ -137,12 +142,6 @@ private data class DriverLocationUpsert(
     @SerialName("driver_id") val driverId: String,
     val location: String,
     val speed: Double? = null,
-)
-
-@Serializable
-private data class DriverLocationHistoryInsert(
-    @SerialName("driver_id") val driverId: String,
-    val location: String,
 )
 
 @Serializable
