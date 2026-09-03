@@ -9,6 +9,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -68,8 +69,11 @@ class ShiftTrackingService : Service() {
     private suspend fun trackLocation() {
         locationProvider.locationUpdates().collect { loc ->
             // A transient failure (e.g. auth not yet restored after a cold restart) is tolerated;
-            // the breadcrumb history can miss a few early fixes.
-            runCatching { actionsRepository.updateLocation(loc.lat, loc.lng, loc.speed) }
+            // the breadcrumb history can miss a few early fixes. It is logged rather than
+            // dropped, though: a *persistent* failure (a write the backend rejects, say) stops
+            // the dashboard's live feed dead, and silently swallowing it leaves nothing to go on.
+            actionsRepository.updateLocation(loc.lat, loc.lng, loc.speed)
+                .onFailure { Log.w(TAG, "Couldn't upload the driver's location", it) }
 
             val session = sessionStore.load() ?: return@collect
             // All packages are delivered but the driver hasn't reached the depot yet — swap the
@@ -146,6 +150,7 @@ class ShiftTrackingService : Service() {
     }
 
     private companion object {
+        const val TAG = "ShiftTracking"
         const val CHANNEL_ID = "shift_tracking"
         const val NOTIFICATION_ID = 1001
     }
