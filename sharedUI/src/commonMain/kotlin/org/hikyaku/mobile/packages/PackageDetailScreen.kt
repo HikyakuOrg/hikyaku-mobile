@@ -40,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -48,12 +49,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import coil3.compose.AsyncImagePainter
+import coil3.compose.LocalPlatformContext
+import coil3.compose.rememberAsyncImagePainter
+import coil3.request.ImageRequest
 import hikyaku.sharedui.generated.resources.Res
 import hikyaku.sharedui.generated.resources.action_back
 import hikyaku.sharedui.generated.resources.action_cancel
@@ -105,6 +111,9 @@ import org.hikyaku.mobile.share.rememberShareText
 import org.hikyaku.mobile.theme.HikyakuTheme
 import org.hikyaku.mobile.util.formatIsoAsDisplayDate
 import org.jetbrains.compose.resources.stringResource
+import qrgenerator.qrkitpainter.QrKitErrorCorrection
+import qrgenerator.qrkitpainter.QrKitLogo
+import qrgenerator.qrkitpainter.QrKitLogoPadding
 import qrgenerator.qrkitpainter.rememberQrKitPainter
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -177,7 +186,7 @@ fun PackageDetailScreen(
                     contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    item { HeroCard(detail) }
+                    item { HeroCard(detail, state.orgLogoUrl) }
                     item {
                         SectionHeader(stringResource(Res.string.package_detail_section_journey))
                         JourneyCard(detail.sender, detail.receiver)
@@ -312,7 +321,7 @@ private fun PackageDetailScreenPreview() {
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun HeroCard(detail: PackageDetail) {
+private fun HeroCard(detail: PackageDetail, orgLogoUrl: String?) {
     val printShippingLabel = rememberPrintShippingLabel()
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -334,7 +343,7 @@ private fun HeroCard(detail: PackageDetail) {
             )
             Surface(color = Color.White, shape = RoundedCornerShape(16.dp), shadowElevation = 0.dp) {
                 Image(
-                    painter = rememberQrKitPainter(data = detail.id),
+                    painter = rememberBrandedQrPainter(data = detail.id, logoUrl = orgLogoUrl),
                     contentDescription = stringResource(Res.string.cd_package_qr_code),
                     modifier = Modifier.size(200.dp).padding(16.dp),
                 )
@@ -348,6 +357,46 @@ private fun HeroCard(detail: PackageDetail) {
                 Spacer(Modifier.width(ButtonDefaults.IconSpacing))
                 Text(stringResource(Res.string.package_detail_print_label))
             }
+        }
+    }
+}
+
+/** Fraction of the QR code's width the logo takes up, and the cleared margin drawn around it. */
+private const val QR_LOGO_SIZE = 0.25f
+private const val QR_LOGO_PADDING = 0.1f
+
+/** Pixel size the logo is decoded at - generous for the ~50dp square it ends up in. */
+private const val QR_LOGO_REQUEST_PX = 256
+
+/**
+ * A QR code for [data], with [logoUrl] drawn in the middle when the org has branding to show.
+ *
+ * The logo only reaches the code once it has actually loaded: [rememberQrKitPainter] buffers what
+ * it draws, so a painter that fills in later would never appear - passing the loaded flag as a key
+ * rebuilds the code at that point instead. A logo that fails to load leaves a plain code rather
+ * than a hole in the middle of one. Error correction goes to [QrKitErrorCorrection.High] so a
+ * scanner can still recover the modules the logo covers.
+ */
+@Composable
+private fun rememberBrandedQrPainter(data: String, logoUrl: String?): Painter {
+    if (logoUrl == null) return rememberQrKitPainter(data = data)
+
+    val context = LocalPlatformContext.current
+    val request = remember(context, logoUrl) {
+        ImageRequest.Builder(context).data(logoUrl).size(QR_LOGO_REQUEST_PX).build()
+    }
+    val logoPainter = rememberAsyncImagePainter(model = request)
+    val logoState by logoPainter.state.collectAsState()
+    val logoLoaded = logoState is AsyncImagePainter.State.Success
+
+    return rememberQrKitPainter(data, logoLoaded) {
+        if (logoLoaded) {
+            errorCorrection = QrKitErrorCorrection.High
+            logo = QrKitLogo(
+                painter = logoPainter,
+                size = QR_LOGO_SIZE,
+                padding = QrKitLogoPadding.Natural(QR_LOGO_PADDING),
+            )
         }
     }
 }

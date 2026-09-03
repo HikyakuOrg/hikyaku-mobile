@@ -25,6 +25,8 @@ data class PackageDetailUiState(
     val orgName: String = "",
     /** Public tracking-page URL for this package, null if the org slug wasn't available. */
     val trackingUrl: String? = null,
+    /** Company logo to draw in the middle of the QR code, null for orgs that aren't branded. */
+    val orgLogoUrl: String? = null,
     /** Whether this package can be deleted: a personal-org courier viewing their own PENDING/ASSIGNED package. */
     val canDelete: Boolean = false,
     val isDeleting: Boolean = false,
@@ -41,6 +43,7 @@ class PackageDetailViewModel(
     private val trackingNumber: String,
     orgSlug: String = "",
     orgName: String = "",
+    orgLogoUrl: String? = null,
     private val isPersonalOrg: Boolean = false,
     private val repository: PackageRepository = PackageRepository(),
     environmentStore: EnvironmentStore = EnvironmentStore(),
@@ -49,6 +52,7 @@ class PackageDetailViewModel(
     private val _state = MutableStateFlow(
         PackageDetailUiState(
             orgName = orgName,
+            orgLogoUrl = orgLogoUrl,
             trackingUrl = orgSlug.takeIf { it.isNotBlank() }?.let {
                 buildTrackingUrl(environmentStore.load()?.source ?: EnvironmentSource.Default, it, trackingNumber)
             },

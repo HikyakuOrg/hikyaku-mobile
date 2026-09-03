@@ -245,12 +245,14 @@ fun MainNavGraph(
                 val trackingNumber = entry.toRoute<PackageDetailRoute>().trackingNumber
                 val orgSlug = homeState.selectedOrganisation?.slug ?: ""
                 val orgName = homeState.selectedOrganisation?.displayName ?: ""
+                val orgLogoUrl = homeState.selectedOrganisation?.brandingLogoUrl
                 val isPersonalOrg = homeState.selectedOrganisation?.isPersonal == true
                 val detailViewModel: PackageDetailViewModel = viewModel(key = trackingNumber) {
                     PackageDetailViewModel(
                         trackingNumber = trackingNumber,
                         orgSlug = orgSlug,
                         orgName = orgName,
+                        orgLogoUrl = orgLogoUrl,
                         isPersonalOrg = isPersonalOrg,
                     )
                 }
