@@ -323,6 +323,12 @@
     <string name="vehicle_error_choose_type">Choose a vehicle type.</string>
     <string name="vehicle_error_choose_warehouse">Choose a home warehouse.</string>
     <string name="vehicle_error_submit_failed">Couldn't create the vehicle.</string>
+    <string name="vehicle_vin_entry_title">Add this vehicle's VIN</string>
+    <string name="vehicle_vin_entry_body">Take a photo of the VIN plate and we'll fill in the make, model and year for you. You can always enter the details yourself instead.</string>
+    <string name="vehicle_vin_entry_scan_action">Take a photo</string>
+    <string name="vehicle_vin_entry_manual_action">Enter manually</string>
+    <string name="vehicle_vin_decode_incomplete">Couldn't find full details for that VIN. Please check the make, model and year.</string>
+    <string name="vehicle_vin_decode_failed">Couldn't look up that VIN. Enter the vehicle details manually.</string>
     <!-- Scan VIN -->
     <string name="vin_scan_title">Scan VIN</string>
     <string name="vin_scan_instruction">Point the camera at the VIN plate or sticker. It is usually on the door frame, the dashboard or the chassis.</string>

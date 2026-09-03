@@ -22,6 +22,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
@@ -76,6 +77,10 @@ import hikyaku.sharedui.generated.resources.vehicle_section_photos
 import hikyaku.sharedui.generated.resources.vehicle_section_type
 import hikyaku.sharedui.generated.resources.vehicle_section_warehouse
 import hikyaku.sharedui.generated.resources.vehicle_submit
+import hikyaku.sharedui.generated.resources.vehicle_vin_entry_body
+import hikyaku.sharedui.generated.resources.vehicle_vin_entry_manual_action
+import hikyaku.sharedui.generated.resources.vehicle_vin_entry_scan_action
+import hikyaku.sharedui.generated.resources.vehicle_vin_entry_title
 import org.hikyaku.mobile.shift.rememberImagePicker
 import org.hikyaku.mobile.shift.rememberPhotoCapture
 import org.hikyaku.mobile.theme.HikyakuTheme
@@ -186,6 +191,7 @@ private fun AddVehicleScreenContent(
                     onValueChange = onSetModel,
                     label = { Text(stringResource(Res.string.vehicle_label_model)) },
                     singleLine = true,
+                    readOnly = state.isModelReadOnly,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 OutlinedTextField(
@@ -193,6 +199,7 @@ private fun AddVehicleScreenContent(
                     onValueChange = onSetMake,
                     label = { Text(stringResource(Res.string.vehicle_label_make)) },
                     singleLine = true,
+                    readOnly = state.isMakeReadOnly,
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -208,11 +215,12 @@ private fun AddVehicleScreenContent(
                         onValueChange = onSetYear,
                         label = { Text(stringResource(Res.string.vehicle_label_year)) },
                         singleLine = true,
+                        readOnly = state.isYearReadOnly,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                         modifier = Modifier.weight(1f),
                     )
                 }
-                VinField(value = state.vin, onValueChange = onSetVin)
+                VinField(value = state.vin, onValueChange = onSetVin, isDecoding = state.isDecodingVin)
                 OutlinedTextField(
                     value = state.grossLimits,
                     onValueChange = onSetGrossLimits,
@@ -284,17 +292,26 @@ private fun AddVehicleScreenPreview() {
  * it needs no route, no entry on [AddVehicleUiState] and no change to
  * [AddVehicleScreenContent]'s parameters, which keeps the preview below working unchanged. Hidden
  * entirely where [vinScanningSupported] is false, leaving plain text entry on desktop.
+ *
+ * On first appearing where scanning is supported, [VinEntryChoiceDialog] asks the user to scan or
+ * type — same local-state trick, so it costs no new parameter either. However the VIN arrives —
+ * scanned or typed — [onValueChange] runs a debounced-by-content backend decode once it reaches 17
+ * characters (see [AddVehicleViewModel.setVin]); [isDecoding] shows that as a small spinner in
+ * place of the scan button.
  */
 @Composable
-private fun VinField(value: String, onValueChange: (String) -> Unit) {
+private fun VinField(value: String, onValueChange: (String) -> Unit, isDecoding: Boolean) {
     var scanning by remember { mutableStateOf(false) }
+    var showEntryChoice by remember { mutableStateOf(vinScanningSupported) }
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
         label = { Text(stringResource(Res.string.vehicle_label_vin)) },
         singleLine = true,
         trailingIcon = {
-            if (vinScanningSupported) {
+            if (isDecoding) {
+                CircularProgressIndicator(modifier = Modifier.size(18.dp), strokeWidth = 2.dp)
+            } else if (vinScanningSupported) {
                 TextButton(onClick = { scanning = true }) {
                     Text(stringResource(Res.string.vehicle_action_scan_vin))
                 }
@@ -311,6 +328,33 @@ private fun VinField(value: String, onValueChange: (String) -> Unit) {
             },
         )
     }
+    if (showEntryChoice) {
+        VinEntryChoiceDialog(
+            onScan = { showEntryChoice = false; scanning = true },
+            onManual = { showEntryChoice = false },
+        )
+    }
+}
+
+/**
+ * Shown once, the moment the add-vehicle form appears on a device that can scan: asks whether to
+ * photograph the VIN plate or type everything in by hand, before the user has touched any field.
+ * Dismissing it any way (backdrop tap, system back) is treated the same as choosing manual entry —
+ * the form underneath is already fully usable either way.
+ */
+@Composable
+private fun VinEntryChoiceDialog(onScan: () -> Unit, onManual: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onManual,
+        title = { Text(stringResource(Res.string.vehicle_vin_entry_title)) },
+        text = { Text(stringResource(Res.string.vehicle_vin_entry_body)) },
+        confirmButton = {
+            TextButton(onClick = onScan) { Text(stringResource(Res.string.vehicle_vin_entry_scan_action)) }
+        },
+        dismissButton = {
+            TextButton(onClick = onManual) { Text(stringResource(Res.string.vehicle_vin_entry_manual_action)) }
+        },
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

@@ -8,17 +8,17 @@ The app's non-Supabase API models are generated from the Hikyaku swagger spec
 | `hikyaku-openapi.published.json` | Pinned snapshot of the spec (extracted from the live `swagger-ui-init.js`, which is how it's served — there's no `.json` endpoint). |
 
 > **Temporarily hand-copied.** The current snapshot is `hikyaku-api`'s committed `openapi.json`
-> (branch `main`, "Add the package and shift API contract"), copied straight in rather than pulled
-> by `refreshHikyakuApiSpec` — that task scrapes the *deployed* prod spec, and prod does not serve
-> `/api/v1/packages` or `/api/v1/shifts` yet. Once the API deploys, go back to
-> `./gradlew refreshHikyakuApiSpec syncModels` and this note can go.
+> (branch `main`), copied straight in rather than pulled by `refreshHikyakuApiSpec` — that task
+> scrapes the *deployed* prod spec, and prod does not yet serve `/api/v1/packages`, `/api/v1/shifts`
+> or `/api/v1/vin/{vin}` (the last of these is live on staging). Once the API deploys, go back to `./gradlew refreshHikyakuApiSpec syncModels` and
+> this note can go.
 
 Generation is wired up as Gradle tasks in `sharedLogic/build.gradle.kts` (see the "Hikyaku API
 client models" section there), using the OpenAPI generator Gradle plugin.
 
 ## What's wired into the app
 
-The mobile app calls **11** of the 55 documented operations, so only the request/response DTOs for
+The mobile app calls **12** of the 56 documented operations, so only the request/response DTOs for
 those are compiled. `./gradlew syncModels` regenerates the full client into a build-directory
 scratch dir, then syncs the DTOs the app uses straight into
 `sharedLogic/src/commonMain/kotlin/org/hikyaku/mobile/api/generated/models/` (package
@@ -38,6 +38,7 @@ scratch dir, then syncs the DTOs the app uses straight into
 | `GET /api/v1/invitations/pending` | `InvitationRepository` | `PendingInvitationDto` (+ `InvitationOrganisationDto`) |
 | `POST /api/v1/invitations/{id}/accept` | `InvitationRepository` | `AcceptInvitationResultDto` |
 | `POST /api/v1/invitations/{id}/decline` | `InvitationRepository` | — (2xx/404 status code alone tells the caller everything the body would) |
+| `GET /api/v1/vin/{vin}` | `VinDecodeRepository` | `VinDecodeResultDto` (+ `VinComponentsDto`/`WmiResultDto`/`ModelYearResultDto`/`CheckDigitResultDto`/`VehicleInfoDto`/`PlantInfoDto`/`EngineInfoDto`/`DecodeErrorDto`) |
 
 The repositories keep calling through the app's shared `appHttpClient` / `ApiEndpoints`; only the
 wire DTOs are generated (the generator's parallel `ApiClient` runtime and the 44 unused endpoint

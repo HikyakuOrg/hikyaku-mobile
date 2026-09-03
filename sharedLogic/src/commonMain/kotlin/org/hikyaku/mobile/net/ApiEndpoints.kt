@@ -73,4 +73,11 @@ object ApiEndpoints {
 
     /** `POST {apiUrl}/api/v1/invitations/{id}/decline` — declines a pending invitation. */
     fun invitationDecline(apiUrl: String, id: String) = "${apiUrl.trimEnd('/')}/api/v1/invitations/$id/decline"
+
+    /**
+     * `GET {apiUrl}/api/v1/vin/{vin}` — decodes a VIN into make/model/year/plant/engine data.
+     * Runs fully offline server-side, so there's no rate limit. Always 200, even for a garbage
+     * VIN — the response's `valid` flag and `components` say how much decoded.
+     */
+    fun vinDecode(apiUrl: String, vin: String) = "${apiUrl.trimEnd('/')}/api/v1/vin/$vin"
 }

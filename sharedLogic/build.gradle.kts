@@ -106,6 +106,9 @@ val hikyakuApiAppModels = listOf(
     "BulkCreatePackagesDto", "BulkCreatePackagesResultDto", "BulkCreatePackageResultDto",
     "CreateShiftDto", "ShiftDto", "ShiftVersionDto", "ShiftPlanDto", "ShiftPackageOutcomeDto",
     "AddPackagesToShiftDto",
+    // VIN decode: GET /api/v1/vin/{vin}.
+    "VinDecodeResultDto", "VinComponentsDto", "WmiResultDto", "ModelYearResultDto",
+    "CheckDigitResultDto", "VehicleInfoDto", "PlantInfoDto", "EngineInfoDto", "DecodeErrorDto",
 )
 
 val refreshHikyakuApiSpec by tasks.registering {
