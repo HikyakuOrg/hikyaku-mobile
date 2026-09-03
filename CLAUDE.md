@@ -55,6 +55,10 @@ Use Grep only when LSP isn't available or for text/pattern searches (comments, s
 
 After writing or editing code, check LSP diagnostics and fix errors before proceeding.
 
+### Inspecting Library/Dependency Code
+
+DO NOT extract `.jar`/`.aar` files to inspect a dependency's classes. kmp-lsp auto-mounts `*-sources.jar` files in-memory straight from `~/.gradle/caches` — use `hover` (declaration kind, signatures, docs) and `goToDefinition` on the symbol instead. Manual extraction is unnecessary; if hover/goToDefinition come back empty, the source jar is missing from the Gradle cache, not a reason to extract the jar by hand.
+
 
 Prefer Java Docs MCP over Grep/Read for versioned documentation for the artifact. 
 
