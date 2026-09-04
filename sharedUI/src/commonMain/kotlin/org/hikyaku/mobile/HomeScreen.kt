@@ -109,7 +109,7 @@ import org.hikyaku.mobile.shift.model.ShiftRoute
 import org.hikyaku.mobile.shift.model.ShiftRoutePreviewInput
 import org.hikyaku.mobile.shift.model.ShiftRouteStep
 import org.hikyaku.mobile.shift.model.ShiftSolution
-import org.hikyaku.mobile.shift.routeMapOrnamentOptions
+import org.hikyaku.mobile.shift.routeMapOverlay
 import org.hikyaku.mobile.theme.HikyakuTheme
 import org.jetbrains.compose.resources.getString
 import org.jetbrains.compose.resources.pluralStringResource
@@ -796,10 +796,8 @@ private fun ShiftRouteMapPreview(
             modifier = Modifier.matchParentSize(),
             baseStyle = BaseStyle.Uri(MAP_STYLE_URL),
             cameraState = cameraState,
-            options = MapOptions(
-                gestureOptions = GestureOptions.AllDisabled,
-                ornamentOptions = routeMapOrnamentOptions(),
-            ),
+            options = MapOptions(gestureOptions = GestureOptions.AllDisabled),
+            overlay = routeMapOverlay(),
         ) {
             // Desktop MapLibre Compose can't render sources/layers yet; show the base map only there.
             if (mapLayersSupported) {
@@ -898,4 +896,41 @@ private fun OrgErrorCard(message: String, onRetry: () -> Unit) {
             TextButton(onClick = onRetry) { Text(stringResource(Res.string.action_retry)) }
         }
     }
+}
+
+// SCRATCH: temporary visual-QA harness for the mapLayersSupported desktop flip, deleted after
+// manual verification. Exercises ShiftRouteMapPreview's road-snapped route line + depot marker.
+@Composable
+fun ShiftRouteMapPreviewHarness() {
+    val previewInputs = listOf(
+        ShiftRoutePreviewInput(
+            routeId = "route-1",
+            stops = listOf(
+                Point(longitude = 103.8200, latitude = 1.3000),
+                Point(longitude = 103.8318, latitude = 1.3048),
+                Point(longitude = 103.8450, latitude = 1.3100),
+                Point(longitude = 103.8500, latitude = 1.2950),
+            ),
+        ),
+    )
+    val routePreviews = mapOf(
+        "route-1" to RoutePreviewUiState(
+            coordinates = listOf(
+                listOf(103.8200, 1.3000),
+                listOf(103.8250, 1.3020),
+                listOf(103.8318, 1.3048),
+                listOf(103.8380, 1.3070),
+                listOf(103.8450, 1.3100),
+                listOf(103.8480, 1.3020),
+                listOf(103.8500, 1.2950),
+            ),
+        ),
+    )
+    // No outer theme here — the caller (desktopApp/main.kt) owns that.
+    Text("ShiftRouteMapPreview", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(8.dp))
+    ShiftRouteMapPreview(
+        previewInputs = previewInputs,
+        routePreviews = routePreviews,
+        modifier = Modifier.fillMaxWidth().height(500.dp),
+    )
 }

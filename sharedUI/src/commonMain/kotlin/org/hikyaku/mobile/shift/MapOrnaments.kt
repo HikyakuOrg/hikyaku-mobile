@@ -1,6 +1,9 @@
 package org.hikyaku.mobile.shift
 
-import org.maplibre.compose.map.OrnamentOptions
+import org.maplibre.compose.overlay.MapOverlay
 
-/** Ornament options for the route map: same as default, but without the top-left scale bar. */
-expect fun routeMapOrnamentOptions(): OrnamentOptions
+/**
+ * Overlay controls for the route map. Android hides the top-left scale bar; desktop draws
+ * [MapOverlay.Default] unchanged.
+ */
+expect fun routeMapOverlay(): MapOverlay

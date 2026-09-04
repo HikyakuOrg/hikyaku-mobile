@@ -1,5 +1,5 @@
 package org.hikyaku.mobile.shift
 
-import org.maplibre.compose.map.OrnamentOptions
+import org.maplibre.compose.overlay.MapOverlay
 
-actual fun routeMapOrnamentOptions(): OrnamentOptions = OrnamentOptions.AllEnabled
+actual fun routeMapOverlay(): MapOverlay = MapOverlay.Default

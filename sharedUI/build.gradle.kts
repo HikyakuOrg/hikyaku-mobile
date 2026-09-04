@@ -39,6 +39,10 @@ kotlin {
             implementation(libs.compose.uiToolingPreview)
             implementation(libs.androidx.activity.compose)
             implementation(libs.androidx.core.ktx)
+            // MapLibre Native FFI render backend. The MapLibre Android SDK is no longer a
+            // transitive dependency of maplibre-compose as of 0.15.0 — without this, the map
+            // renders nothing at runtime.
+            runtimeOnly(libs.maplibre.compose.runtime.vulkan.android)
             // Phone-number validation/formatting; the actual for `expect object PhoneNumbers`.
             implementation(libs.libphonenumber)
             // Shipping-label printing; the actual for `expect fun rememberPrintShippingLabel`.
@@ -80,18 +84,13 @@ kotlin {
         jvmMain.dependencies {
             // Phone-number validation/formatting; the actual for `expect object PhoneNumbers`.
             implementation(libs.libphonenumber)
-            // MapLibre on desktop renders via MapLibre Native through a JNI bindings module
-            // that bundles the platform-specific native library (libmaplibre-jni.so/.dylib/.dll).
-            // Without this, the map is blank at runtime with:
-            //   UnsatisfiedLinkError: Native library not found in JAR: /<os>/<arch>/<renderer>/...
-            // Select exactly the one capability matching the host OS/arch/renderer.
-            runtimeOnly(libs.maplibre.native.bindings.jni.get().toString()) {
-                capabilities {
-                    requireCapability(
-                        "org.maplibre.compose:maplibre-native-bindings-jni-${maplibreDesktopTarget()}"
-                    )
-                }
-            }
+            // MapLibre on desktop renders via MapLibre Native FFI through a per-OS/arch runtime
+            // artifact (replaces the old single maplibre-native-bindings-jni + capability
+            // selection). Without this, the map is blank at runtime.
+            runtimeOnly(
+                "org.maplibre.compose:maplibre-compose-runtime-${maplibreDesktopTarget()}:" +
+                    libs.versions.maplibre.compose.get()
+            )
         }
         commonMain.dependencies {
             api(projects.sharedLogic)
@@ -129,9 +128,10 @@ dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
 }
 
-// Resolves the MapLibre Native JNI bindings capability for the current build host.
-// Published targets: macos-aarch64-metal, linux-amd64-opengl, linux-amd64-vulkan,
-// windows-amd64-opengl, windows-amd64-vulkan.
+// Resolves the MapLibre Native FFI runtime artifact suffix for the current build host.
+// Published targets (org.maplibre.compose:maplibre-compose-runtime-<target>): metal-macos-arm64,
+// vulkan-linux-x64, vulkan-linux-arm64, vulkan-windows-x64, vulkan-windows-arm64. There is no
+// desktop OpenGL target (Vulkan/Metal only) and no Intel-Mac target as of 0.15.0.
 fun maplibreDesktopTarget(): String {
     val os = System.getProperty("os.name").lowercase()
     val hostOs = when {
@@ -140,10 +140,10 @@ fun maplibreDesktopTarget(): String {
         else -> os.split(" ").first() // e.g. "linux"
     }
     val hostArch = when (val arch = System.getProperty("os.arch").lowercase()) {
-        "x86_64", "amd64" -> "amd64"
-        "aarch64", "arm64" -> "aarch64"
+        "x86_64", "amd64" -> "x64"
+        "aarch64", "arm64" -> "arm64"
         else -> arch
     }
-    val renderer = if (hostOs == "macos") "metal" else "opengl"
-    return "$hostOs-$hostArch-$renderer"
+    val renderer = if (hostOs == "macos") "metal" else "vulkan"
+    return "$renderer-$hostOs-$hostArch"
 }

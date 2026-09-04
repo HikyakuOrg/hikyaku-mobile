@@ -24,8 +24,6 @@ import androidx.exifinterface.media.ExifInterface
 import java.io.File
 import kotlinx.coroutines.launch
 import org.hikyaku.mobile.shift.location.model.DeviceLocation
-import org.maplibre.compose.location.LocationProvider
-import org.maplibre.compose.location.rememberDefaultLocationProvider
 import org.hikyaku.mobile.shift.location.LocationProvider as DeviceLocationProvider
 
 @Composable
@@ -209,10 +207,6 @@ private fun tagGpsLocation(file: File, location: DeviceLocation) {
         }
     }
 }
-
-/** Foreground location is already granted by the time a shift can be started (see [rememberShiftPermissions]). */
-@Composable
-actual fun rememberShiftLocationProvider(): LocationProvider = rememberDefaultLocationProvider()
 
 @Composable
 actual fun rememberImagePicker(onResult: (List<ByteArray>) -> Unit): () -> Unit {

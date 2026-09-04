@@ -1,8 +1,6 @@
 package org.hikyaku.mobile.shift
 
 import androidx.compose.runtime.Composable
-import org.maplibre.compose.location.LocationProvider
-import org.maplibre.compose.location.rememberNullLocationProvider
 
 /** Desktop has no permission gate; shifts can be started for testing (location simply won't stream). */
 @Composable
@@ -27,10 +25,6 @@ actual fun rememberPhotoCapture(onResult: (ByteArray?) -> Unit): () -> Unit = { 
 /** Desktop has no image picker. */
 @Composable
 actual fun rememberImagePicker(onResult: (List<ByteArray>) -> Unit): () -> Unit = { onResult(emptyList()) }
-
-/** Desktop has no location API; the puck never appears. */
-@Composable
-actual fun rememberShiftLocationProvider(): LocationProvider = rememberNullLocationProvider()
 
 /** Desktop has no runtime permission model, and no camera to grant access to. */
 @Composable

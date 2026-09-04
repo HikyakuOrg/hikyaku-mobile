@@ -2,7 +2,6 @@ package org.hikyaku.mobile.shift
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
-import org.maplibre.compose.location.LocationProvider
 
 /**
  * Returns a launcher that requests every permission a backgrounded shift needs, then reports
@@ -46,14 +45,6 @@ expect fun rememberPhotoCapture(onResult: (ByteArray?) -> Unit): () -> Unit
  */
 @Composable
 expect fun rememberImagePicker(onResult: (List<ByteArray>) -> Unit): () -> Unit
-
-/**
- * A [LocationProvider] for showing the driver's own position on the route map while a shift is
- * running. Backed by the platform's location APIs on Android (foreground location is already
- * granted by the time a shift starts); desktop has no such API, so it never emits.
- */
-@Composable
-expect fun rememberShiftLocationProvider(): LocationProvider
 
 /** The CAMERA runtime grant, plus a launcher for requesting it. */
 @Stable
