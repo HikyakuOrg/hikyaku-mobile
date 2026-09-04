@@ -34,6 +34,7 @@ kmp-lsp check <file|dir>                            # instant syntax check, no i
 kmp-lsp diagnose <file> --root .                    # call-arg / missing-import diagnostics
 kmp-lsp index --root .                              # build/refresh the cache (run after large refactors)
 kmp-lsp sources --root .                            # list resolved source roots
+kmp-lsp extract-sources <pattern...> --dry-run       # materialize Gradle *-sources.jar into ~/.kmp-lsp/sources
 ```
 
 `find`/`refs` accept a bare name (`ScanPackagesOverlay`) or dotted FQN — both work. Run from the
@@ -56,10 +57,57 @@ been exporting/editing `PATH` manually earlier in that session, open a fresh she
 than layering more `PATH` edits on top. `find` (pure index lookup, no `rg` subprocess) isn't
 affected by any of this.
 
+## If `find`/`hover` come back empty for a third-party symbol — don't extract the compiled jar
+
+`find`/`hover` resolve library symbols from `-sources.jar` files that `kmp-lsp extract-sources` has
+already unpacked into `~/.kmp-lsp/sources`. Two things commonly make that step come up empty, and
+neither is a reason to unzip the compiled `.jar`/`.aar` by hand (that gives you decompiled bytecode,
+not real source, and CLAUDE.md's Null Safety / doc conventions won't be visible in it anyway):
+
+1. **The sources jar was never downloaded.** Gradle only fetches the compiled `.jar` for a
+   dependency by default — `-sources.jar` is a separate classified artifact it does *not* pull down
+   on a normal build/sync. Check first:
+   `find "$USERPROFILE/.gradle/caches/modules-2/files-2.1/<group>/<artifact>" -iname "*sources*.jar"`
+   (or `Get-ChildItem -Recurse -Filter *sources*.jar` in PowerShell). If nothing's there, force a
+   download with a throwaway detached configuration via an init script (doesn't touch the project's
+   own build files, so nothing to revert):
+
+   ```kotlin
+   gradle.rootProject {
+       tasks.register("downloadSources") {
+           doLast {
+               val coords = listOf("<group>:<artifact>:<version>") // one entry per dependency
+               val cfg = configurations.detachedConfiguration(
+                   *coords.map { dependencies.create("$it:sources") }.toTypedArray()
+               )
+               cfg.isTransitive = false
+               cfg.resolve().forEach { println("Resolved: $it") }
+           }
+       }
+   }
+   ```
+
+   Then: `./gradlew --init-script <path-to-script> downloadSources`. Get the exact
+   `group:artifact:version` from the jar already sitting in the Gradle cache (or from
+   `gradle/libs.versions.toml` — note KMP artifacts publish per-target, e.g.
+   `io.github.jan-tennert.supabase:auth-kt-jvm:3.8.0`, not the bare module name from the catalog).
+   Confirm the sources artifact actually exists upstream first if unsure — e.g.
+   `curl -I https://repo1.maven.org/maven2/<group-path>/<artifact>/<version>/<artifact>-<version>-sources.jar`
+   should return `200`.
+
+   (The classic Gradle `idea` plugin's `downloadSources = true` + `ideaModule` task, which is the
+   usual trick for plain Java projects, does **not** work here — it doesn't understand Kotlin
+   Multiplatform source sets and silently fetches nothing for KMP dependencies.)
+
+2. **`kmp-lsp extract-sources` hasn't been run since the jar landed in the cache.** Once the
+   `-sources.jar` exists in `~/.gradle/caches`, run
+   `kmp-lsp extract-sources <pattern> --dry-run` to confirm it's found, then drop `--dry-run` to
+   unpack it into `~/.kmp-lsp/sources`. `find`/`hover` pick it up on the next invocation — verify
+   with `kmp-lsp find <SomeTypeFromThatLibrary> --root .` and confirm the result path is under
+   `~/.kmp-lsp/sources/...`, not a manually-extracted temp dir.
+
 ## What's NOT exposed here
 
 - No `goToImplementation` / `rename` / `workspaceSymbol` / `documentSymbol` CLI subcommands exist —
   those are LSP-protocol-only features (see `kmp-lsp --help`); this repo has no editor/MCP LSP client
   wired up, so they aren't reachable from Claude Code. `find` covers most goToDefinition-style needs.
-- No Serena MCP is configured in this repo (no `.mcp.json`) — ignore any Serena-related instructions
-  you find in kmp-lsp's own upstream docs, they don't apply here.
