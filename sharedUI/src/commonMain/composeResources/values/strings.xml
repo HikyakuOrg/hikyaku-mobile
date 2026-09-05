@@ -22,6 +22,7 @@
     <string name="cd_profile_picture">Profile picture</string>
     <string name="cd_country_selector">Country selector</string>
     <string name="cd_package_photo">Package photo</string>
+    <string name="cd_signature_preview">Signature preview</string>
     <string name="cd_open_navigation_menu">Open navigation menu</string>
     <string name="cd_previous_week">Previous week</string>
     <string name="cd_next_week">Next week</string>
@@ -162,6 +163,9 @@
     <string name="shift_map_expand">Tap to expand</string>
     <string name="shift_photo_added">Photo added ✓</string>
     <string name="shift_add_photo">Add photo</string>
+    <string name="shift_signature_added">Signature added ✓</string>
+    <string name="shift_add_signature">Add signature</string>
+    <string name="shift_signature_prompt">Have the customer sign below</string>
     <string name="shift_mark_delivered">Mark delivered</string>
     <string name="shift_pod_description_label">Photo description</string>
     <string name="shift_pod_description_placeholder">Describe the delivery (optional)</string>
@@ -171,6 +175,7 @@
     <string name="poi_bicycle_parking">Bicycle parking</string>
     <string name="shift_error_start_failed">Couldn't start the shift</string>
     <string name="shift_error_photo_upload_failed">Photo upload failed.</string>
+    <string name="shift_error_signature_upload_failed">Signature upload failed.</string>
     <string name="shift_error_advance_failed">Couldn't advance to the next stop.</string>
     <string name="shift_error_mark_delivered_failed">Couldn't mark this stop delivered</string>
     <string name="shift_scan_packages_button">Scan packages (%1$d of %2$d)</string>

@@ -8,6 +8,7 @@ import hikyaku.sharedui.generated.resources.error_load_routes
 import hikyaku.sharedui.generated.resources.shift_error_advance_failed
 import hikyaku.sharedui.generated.resources.shift_error_mark_delivered_failed
 import hikyaku.sharedui.generated.resources.shift_error_photo_upload_failed
+import hikyaku.sharedui.generated.resources.shift_error_signature_upload_failed
 import hikyaku.sharedui.generated.resources.shift_error_start_failed
 import io.github.jan.supabase.storage.StorageItem
 import kotlinx.coroutines.Job
@@ -835,11 +836,16 @@ class ShiftDetailViewModel(
     }
 
     /**
-     * Marks [packageId] delivered (optionally attaching [photoBytes] as proof, with [description]
-     * as its caption) and rolls the next undelivered stop to in transit. When no stop remains,
-     * deliveries are complete.
+     * Marks [packageId] delivered (optionally attaching [photoBytes] and/or [signatureBytes] as
+     * proof, with [description] as the photo's caption) and rolls the next undelivered stop to in
+     * transit. When no stop remains, deliveries are complete.
      */
-    fun markDelivered(packageId: String, photoBytes: ByteArray? = null, description: String? = null) {
+    fun markDelivered(
+        packageId: String,
+        photoBytes: ByteArray? = null,
+        signatureBytes: ByteArray? = null,
+        description: String? = null,
+    ) {
         val current = _state.value
         if (current.isActionInProgress) return
         _state.value = current.copy(isActionInProgress = true, actionError = null)
@@ -849,6 +855,11 @@ class ShiftDetailViewModel(
                 // A failed photo upload shouldn't block the delivery; surface it but continue.
                 actionsRepository.uploadProofPhotoOrQueue(packageId, photoBytes, description)
                     .onFailure { _state.value = _state.value.copy(actionError = it.message ?: getString(Res.string.shift_error_photo_upload_failed)) }
+            }
+            if (signatureBytes != null) {
+                // Same non-blocking treatment as the photo above.
+                actionsRepository.uploadProofSignature(packageId, signatureBytes)
+                    .onFailure { _state.value = _state.value.copy(actionError = it.message ?: getString(Res.string.shift_error_signature_upload_failed)) }
             }
             actionsRepository.markDelivered(packageId)
                 .onSuccess {

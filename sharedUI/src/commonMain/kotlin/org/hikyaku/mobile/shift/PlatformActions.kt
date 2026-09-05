@@ -35,6 +35,12 @@ expect fun rememberHasShiftTrackingPermissions(): Boolean
 /**
  * Returns a launcher that opens the camera to capture a proof-of-delivery photo, delivering the
  * JPEG bytes to [onResult] (or `null` if cancelled/failed). Stubbed off Android.
+ *
+ * This is one of three proof-of-delivery capture patterns in the app, alongside
+ * [rememberCameraPermission]'s embedded CameraX preview (VIN/QR scanning) and a signature, which
+ * needs neither a camera nor a platform split at all — see
+ * [org.hikyaku.mobile.shift.pod.SignaturePad], a plain Compose `Canvas` + `pointerInput`
+ * drag-drawing surface in `shift/pod/SignaturePad.kt`.
  */
 @Composable
 expect fun rememberPhotoCapture(onResult: (ByteArray?) -> Unit): () -> Unit

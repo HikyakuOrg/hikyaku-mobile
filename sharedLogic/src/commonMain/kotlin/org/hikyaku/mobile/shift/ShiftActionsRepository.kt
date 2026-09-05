@@ -120,9 +120,29 @@ class ShiftActionsRepository(
         )
     }
 
+    /**
+     * Uploads a proof-of-delivery signature to `packages/{packageId}/signature/signature.png` and
+     * records a `package_proof_of_delivery` row pointing at it. Unlike [uploadProofPhoto], this
+     * never upserts and the signature sub-path carries no storage UPDATE grant, so a captured
+     * signature can't be silently replaced; the unique `(package_id, pod_type_id)` index on
+     * `package_proof_of_delivery` — which also has no UPDATE/DELETE policy at all — backs the same
+     * guarantee at the metadata layer.
+     */
+    suspend fun uploadProofSignature(
+        packageId: String,
+        pngBytes: ByteArray,
+    ): Result<Unit> = runCatching {
+        val path = "$packageId/signature/signature.png"
+        client.storage.from(SupabaseBuckets.PACKAGES).upload(path, pngBytes)
+        client.postgrest.from(SupabaseTables.PACKAGE_PROOF_OF_DELIVERY)
+            .insert(PodInsert(packageId, POD_TYPE_SIGNATURE, path))
+        Unit
+    }
+
     private companion object {
-        // pod_type lookup id for "Photo".
+        // pod_type lookup ids (see the `pod_type` table).
         const val POD_TYPE_PHOTO = 2
+        const val POD_TYPE_SIGNATURE = 3
     }
 }
 

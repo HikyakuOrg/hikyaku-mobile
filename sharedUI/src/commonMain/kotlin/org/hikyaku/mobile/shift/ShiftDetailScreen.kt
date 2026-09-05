@@ -7,6 +7,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -75,6 +76,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,16 +85,21 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.rememberGraphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.addPathNodes
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -101,6 +108,7 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil3.compose.AsyncImage
 import io.github.jan.supabase.storage.StorageItem
+import kotlinx.coroutines.launch
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -111,8 +119,12 @@ import org.hikyaku.mobile.map.mapLayersSupported
 import org.hikyaku.mobile.share.rememberShareText
 import org.hikyaku.mobile.shift.pod.PodDraftState
 import org.hikyaku.mobile.shift.pod.PodProofreadState
+import org.hikyaku.mobile.shift.pod.SignaturePad
+import org.hikyaku.mobile.shift.pod.encodeToPngBytes
+import org.hikyaku.mobile.shift.pod.exportSignature
 import org.hikyaku.mobile.shift.pod.rememberPodDescriber
 import org.hikyaku.mobile.shift.pod.rememberPodProofreader
+import org.hikyaku.mobile.shift.pod.rememberSignatureState
 import org.hikyaku.mobile.shift.scan.ScanPackagesOverlay
 import org.hikyaku.mobile.theme.HikyakuTheme
 import org.hikyaku.mobile.toast.LocalToastHostState
@@ -126,6 +138,7 @@ import org.hikyaku.mobile.util.isoDateToEpochMillisUtc
 import hikyaku.sharedui.generated.resources.Res
 import hikyaku.sharedui.generated.resources.action_back
 import hikyaku.sharedui.generated.resources.action_cancel
+import hikyaku.sharedui.generated.resources.action_clear
 import hikyaku.sharedui.generated.resources.action_continue
 import hikyaku.sharedui.generated.resources.action_dismiss
 import hikyaku.sharedui.generated.resources.action_not_now
@@ -134,10 +147,13 @@ import hikyaku.sharedui.generated.resources.action_open_settings
 import hikyaku.sharedui.generated.resources.action_remove
 import hikyaku.sharedui.generated.resources.action_retry
 import hikyaku.sharedui.generated.resources.action_share
+import hikyaku.sharedui.generated.resources.action_undo
 import hikyaku.sharedui.generated.resources.tracking_share_text
 import hikyaku.sharedui.generated.resources.create_shift_pick_date
 import hikyaku.sharedui.generated.resources.cd_package_photo
+import hikyaku.sharedui.generated.resources.cd_signature_preview
 import hikyaku.sharedui.generated.resources.shift_add_photo
+import hikyaku.sharedui.generated.resources.shift_add_signature
 import hikyaku.sharedui.generated.resources.shift_call_recipient
 import hikyaku.sharedui.generated.resources.shift_add_stop
 import hikyaku.sharedui.generated.resources.shift_add_stop_no_packages
@@ -164,6 +180,8 @@ import hikyaku.sharedui.generated.resources.shift_permission_required_message
 import hikyaku.sharedui.generated.resources.shift_photo_added
 import hikyaku.sharedui.generated.resources.shift_pod_description_label
 import hikyaku.sharedui.generated.resources.shift_pod_description_placeholder
+import hikyaku.sharedui.generated.resources.shift_signature_added
+import hikyaku.sharedui.generated.resources.shift_signature_prompt
 import hikyaku.sharedui.generated.resources.shift_route_label
 import hikyaku.sharedui.generated.resources.shift_scan_gate_banner
 import hikyaku.sharedui.generated.resources.shift_scan_packages_button
@@ -336,7 +354,7 @@ private fun ShiftDetailScreenContent(
     onClearEditError: () -> Unit,
     onClearActionError: () -> Unit,
     onRemoveStop: (RouteStep) -> Unit,
-    onMarkDelivered: (packageId: String, photoBytes: ByteArray?, description: String?) -> Unit,
+    onMarkDelivered: (packageId: String, photoBytes: ByteArray?, signatureBytes: ByteArray?, description: String?) -> Unit,
     onOpenAddStop: () -> Unit,
     onCloseAddStop: () -> Unit,
     onSelectAddStopPackage: (String) -> Unit,
@@ -367,6 +385,10 @@ private fun ShiftDetailScreenContent(
     var descriptionText by remember { mutableStateOf("") }
     var descriptionEditedByUser by remember { mutableStateOf(false) }
 
+    // Signature captured for the same stop; cleared alongside the photo state above.
+    var capturedSignature by remember { mutableStateOf<ByteArray?>(null) }
+    var showSignaturePad by remember { mutableStateOf(false) }
+
     val podDescriber = rememberPodDescriber()
     val podProofreader = rememberPodProofreader()
 
@@ -374,6 +396,7 @@ private fun ShiftDetailScreenContent(
         capturedPhoto = null
         descriptionText = ""
         descriptionEditedByUser = false
+        capturedSignature = null
         podDescriber.resetDraft()
     }
 
@@ -403,6 +426,12 @@ private fun ShiftDetailScreenContent(
             descriptionEditedByUser = false
             podDescriber.describe(bytes)
         }
+    }
+    if (showSignaturePad) {
+        SignatureCaptureDialog(
+            onConfirm = { bytes -> capturedSignature = bytes; showSignaturePad = false },
+            onDismiss = { showSignaturePad = false },
+        )
     }
     // Background tracking is required, so a shift can only start once "Allow all the time" location
     // (and notifications) are granted; otherwise we surface a banner pointing the user to settings.
@@ -626,6 +655,7 @@ private fun ShiftDetailScreenContent(
                                 showNavigate = state.shiftStarted || state.allPackagesScanned,
                                 actionEnabled = !state.isActionInProgress,
                                 capturedPhoto = capturedPhoto,
+                                capturedSignature = capturedSignature,
                                 descriptionText = descriptionText,
                                 descriptionBusy = podDescriber.state is PodDraftState.Analyzing ||
                                     podProofreader.state is PodProofreadState.Checking,
@@ -641,14 +671,21 @@ private fun ShiftDetailScreenContent(
                                 removeEnabled = !state.isEditing,
                                 onRemove = { onRemoveStop(step) },
                                 onAddPhoto = capturePhoto,
+                                onAddSignature = { showSignaturePad = true },
                                 shareMessage = shareMessage,
                                 onClick = state.trackingNumberFor(step)?.let { tracking ->
                                     { onPackageClick(tracking) }
                                 },
                                 onMarkDelivered = {
                                     if (packageId != null) {
-                                        onMarkDelivered(packageId, capturedPhoto, descriptionText.trim().takeIf { it.isNotBlank() })
+                                        onMarkDelivered(
+                                            packageId,
+                                            capturedPhoto,
+                                            capturedSignature,
+                                            descriptionText.trim().takeIf { it.isNotBlank() },
+                                        )
                                         capturedPhoto = null
+                                        capturedSignature = null
                                         descriptionText = ""
                                         descriptionEditedByUser = false
                                         podDescriber.resetDraft()
@@ -788,7 +825,7 @@ private fun ShiftDetailScreenPreview() {
             onClearEditError = {},
             onClearActionError = {},
             onRemoveStop = {},
-            onMarkDelivered = { _, _, _ -> },
+            onMarkDelivered = { _, _, _, _ -> },
             onOpenAddStop = {},
             onCloseAddStop = {},
             onSelectAddStopPackage = {},
@@ -1760,6 +1797,7 @@ private fun PackageCard(
     showNavigate: Boolean,
     actionEnabled: Boolean,
     capturedPhoto: ByteArray?,
+    capturedSignature: ByteArray?,
     descriptionText: String,
     descriptionBusy: Boolean,
     onDescriptionChange: (String) -> Unit,
@@ -1769,6 +1807,7 @@ private fun PackageCard(
     removeEnabled: Boolean,
     onRemove: () -> Unit,
     onAddPhoto: () -> Unit,
+    onAddSignature: () -> Unit,
     shareMessage: String?,
     onClick: (() -> Unit)?,
     onMarkDelivered: () -> Unit,
@@ -1929,11 +1968,8 @@ private fun PackageCard(
             }
             if (isInTransit) {
                 Spacer(Modifier.height(12.dp))
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    OutlinedButton(onClick = onAddPhoto, enabled = actionEnabled) {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onAddPhoto, enabled = actionEnabled, modifier = Modifier.weight(1f)) {
                         Text(
                             if (capturedPhoto != null) {
                                 stringResource(Res.string.shift_photo_added)
@@ -1942,12 +1978,22 @@ private fun PackageCard(
                             },
                         )
                     }
-                    Button(
-                        onClick = onMarkDelivered,
-                        enabled = actionEnabled,
-                        modifier = Modifier.weight(1f),
-                    ) { Text(stringResource(Res.string.shift_mark_delivered)) }
+                    OutlinedButton(onClick = onAddSignature, enabled = actionEnabled, modifier = Modifier.weight(1f)) {
+                        Text(
+                            if (capturedSignature != null) {
+                                stringResource(Res.string.shift_signature_added)
+                            } else {
+                                stringResource(Res.string.shift_add_signature)
+                            },
+                        )
+                    }
                 }
+                Spacer(Modifier.height(8.dp))
+                Button(
+                    onClick = onMarkDelivered,
+                    enabled = actionEnabled,
+                    modifier = Modifier.fillMaxWidth(),
+                ) { Text(stringResource(Res.string.shift_mark_delivered)) }
                 if (capturedPhoto != null) {
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1980,6 +2026,69 @@ private fun PackageCard(
                                 .onFocusChanged { if (!it.isFocused) onDescriptionBlur() },
                         )
                     }
+                }
+                if (capturedSignature != null) {
+                    Spacer(Modifier.height(12.dp))
+                    AsyncImage(
+                        model = capturedSignature,
+                        contentDescription = stringResource(Res.string.cd_signature_preview),
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .size(width = 140.dp, height = 70.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp)),
+                    )
+                }
+            }
+        }
+    }
+}
+
+/** Full-screen dialog hosting a [SignaturePad]; hands back PNG bytes once the courier confirms. */
+@Composable
+private fun SignatureCaptureDialog(
+    onConfirm: (ByteArray) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val signatureState = rememberSignatureState()
+    val graphicsLayer = rememberGraphicsLayer()
+    val density = LocalDensity.current
+    val layoutDirection = LocalLayoutDirection.current
+    var padSize by remember { mutableStateOf(IntSize.Zero) }
+    val scope = rememberCoroutineScope()
+
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(modifier = Modifier.fillMaxSize()) {
+            Column(Modifier.fillMaxSize().padding(16.dp)) {
+                Text(stringResource(Res.string.shift_signature_prompt), style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(12.dp))
+                SignaturePad(
+                    state = signatureState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(8.dp))
+                        .onSizeChanged { padSize = it },
+                )
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    TextButton(onClick = onDismiss) { Text(stringResource(Res.string.action_cancel)) }
+                    OutlinedButton(onClick = signatureState::undo, enabled = signatureState.canUndo) {
+                        Text(stringResource(Res.string.action_undo))
+                    }
+                    OutlinedButton(onClick = signatureState::clear, enabled = signatureState.canUndo) {
+                        Text(stringResource(Res.string.action_clear))
+                    }
+                    Button(
+                        onClick = {
+                            scope.launch {
+                                val bitmap = exportSignature(signatureState, graphicsLayer, density, layoutDirection, padSize)
+                                onConfirm(bitmap.encodeToPngBytes())
+                            }
+                        },
+                        enabled = signatureState.canUndo,
+                        modifier = Modifier.weight(1f),
+                    ) { Text(stringResource(Res.string.action_ok)) }
                 }
             }
         }
