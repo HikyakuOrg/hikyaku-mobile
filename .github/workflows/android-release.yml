@@ -1,24 +1,30 @@
-name: Android release and F-Droid publish
+name: Android tagged release
+
+# Pushing a tag named vMAJOR.MINOR.PATCH (e.g. v1.4.2) builds one signed APK
+# and ships it to every destination from that single artifact: Firebase App
+# Distribution, S3 (+ F-Droid repo index), and a draft GitHub Release with
+# the APK attached. Pushing to main no longer triggers a release on its own.
 
 on:
   push:
-    branches: [main]
+    tags:
+      - "v*.*.*"
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 # Do not cancel a run that is already uploading. Queue instead.
 concurrency:
-  group: android-s3-release-${{ github.ref }}
+  group: android-release-${{ github.ref }}
   cancel-in-progress: false
 
 env:
   PACKAGE_ID: org.hikyaku.mobile
 
 jobs:
-  build-and-upload:
-    name: Build signed APK and upload to S3
+  build-and-release:
+    name: Build signed APK and publish to Firebase, S3, and GitHub Releases
     runs-on: ubuntu-latest
 
     steps:
@@ -39,6 +45,7 @@ jobs:
 
       - name: Check the required secrets and variables
         env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
@@ -48,7 +55,7 @@ jobs:
           S3_BUCKET: ${{ vars.S3_BUCKET }}
         run: |
           missing=""
-          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD \
+          for name in FIREBASE_SERVICE_ACCOUNT ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD \
                       ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD \
                       AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY; do
             eval "value=\${$name}"
@@ -59,6 +66,30 @@ jobs:
             echo "::error::Missing repository secrets or variables:$missing"
             exit 1
           fi
+
+      - name: Parse version from the tag
+        run: |
+          set -eu
+          tag="${GITHUB_REF_NAME}"
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Tag '$tag' does not match the required vMAJOR.MINOR.PATCH format (e.g. v1.4.2)."
+            exit 1
+          fi
+          version_name="${tag#v}"
+          IFS='.' read -r major minor patch <<< "$version_name"
+          if [ "$minor" -ge 100 ] || [ "$patch" -ge 100 ]; then
+            echo "::error::MINOR and PATCH must each be less than 100 (versionCode = MAJOR*10000 + MINOR*100 + PATCH)."
+            exit 1
+          fi
+          version_code=$((10#$major * 10000 + 10#$minor * 100 + 10#$patch))
+          echo "RELEASE_TAG=$tag" >> "$GITHUB_ENV"
+          echo "VERSION_NAME=$version_name" >> "$GITHUB_ENV"
+          echo "VERSION_CODE=$version_code" >> "$GITHUB_ENV"
+
+      - name: Write the Firebase service account credentials
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: printf '%s' "$FIREBASE_SERVICE_ACCOUNT" > androidApp/firebase-service-account.json
 
       - name: Write the release keystore
         env:
@@ -77,19 +108,18 @@ jobs:
           } > androidApp/keystore.properties
 
       - name: Configure local.properties
-        run: echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
-
-      - name: Set the version info
         run: |
-          echo "GIT_SHA=$(git rev-parse --short=7 HEAD)" >> "$GITHUB_ENV"
-          echo "VERSION_CODE=${{ github.run_number }}" >> "$GITHUB_ENV"
+          {
+            echo "firebase.serviceCredentialsFile=$GITHUB_WORKSPACE/androidApp/firebase-service-account.json"
+            echo "sdk.dir=$ANDROID_SDK_ROOT"
+          } > local.properties
 
-      - name: Build the release APK
+      - name: Build the release APK and upload to Firebase App Distribution
         run: |
           chmod +x gradlew
-          ./gradlew :androidApp:assembleRelease --stacktrace \
+          ./gradlew :androidApp:assembleRelease :androidApp:appDistributionUploadRelease --stacktrace \
             -PappVersionCode=${{ env.VERSION_CODE }} \
-            -PappVersionName=1.0.0-${{ env.GIT_SHA }}
+            -PappVersionName=${{ env.VERSION_NAME }}
 
       - name: Find the APK and check the signature
         run: |
@@ -100,7 +130,7 @@ jobs:
           fi
           echo "APK_PATH=$apk" >> "$GITHUB_ENV"
           # F-Droid clients reject an APK that the repository key did not sign,
-          # so an unsigned build must not reach the bucket.
+          # so an unsigned build must not reach the bucket or the release.
           apksigner=$(find "$ANDROID_SDK_ROOT/build-tools" -name apksigner -type f 2>/dev/null | sort -r | head -1 || true)
           if [ -n "$apksigner" ]; then
             "$apksigner" verify --print-certs "$apk"
@@ -154,8 +184,9 @@ jobs:
             echo ""
             echo "| Item | Value |"
             echo "|---|---|"
+            echo "| Tag | \`$RELEASE_TAG\` |"
             echo "| Version code | \`$VERSION_CODE\` |"
-            echo "| Version name | \`1.0.0-$GIT_SHA\` |"
+            echo "| Version name | \`$VERSION_NAME\` |"
             echo "| Object | \`$S3_PREFIX/$name\` |"
             echo "| Bucket | \`$S3_BUCKET\` |"
           } >> "$GITHUB_STEP_SUMMARY"
@@ -167,6 +198,15 @@ jobs:
           path: ${{ env.APK_PATH }}
           if-no-files-found: error
           retention-days: 30
+
+      - name: Create the draft GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_TAG }}
+          draft: true
+          files: ${{ env.APK_PATH }}
+          generate_release_notes: true
 
       - name: Check the F-Droid indexing secrets and variables
         env:
