@@ -9,8 +9,6 @@ plugins {
 }
 
 kotlin {
-    jvm()
-    
     androidLibrary {
        namespace = "org.hikyaku.mobile.sharedUI"
        compileSdk = libs.versions.android.compileSdk.get().toInt()
@@ -81,17 +79,6 @@ kotlin {
             // covers the ListenableFuture side. Both bridges are needed for .await().
             implementation(libs.kotlinx.coroutinesPlayServices)
         }
-        jvmMain.dependencies {
-            // Phone-number validation/formatting; the actual for `expect object PhoneNumbers`.
-            implementation(libs.libphonenumber)
-            // MapLibre on desktop renders via MapLibre Native FFI through a per-OS/arch runtime
-            // artifact (replaces the old single maplibre-native-bindings-jni + capability
-            // selection). Without this, the map is blank at runtime.
-            runtimeOnly(
-                "org.maplibre.compose:maplibre-compose-runtime-${maplibreDesktopTarget()}:" +
-                    libs.versions.maplibre.compose.get()
-            )
-        }
         commonMain.dependencies {
             api(projects.sharedLogic)
             implementation(libs.calendar.composeMultiplatform)
@@ -126,24 +113,4 @@ kotlin {
 
 dependencies {
     androidRuntimeClasspath(libs.compose.uiTooling)
-}
-
-// Resolves the MapLibre Native FFI runtime artifact suffix for the current build host.
-// Published targets (org.maplibre.compose:maplibre-compose-runtime-<target>): metal-macos-arm64,
-// vulkan-linux-x64, vulkan-linux-arm64, vulkan-windows-x64, vulkan-windows-arm64. There is no
-// desktop OpenGL target (Vulkan/Metal only) and no Intel-Mac target as of 0.15.0.
-fun maplibreDesktopTarget(): String {
-    val os = System.getProperty("os.name").lowercase()
-    val hostOs = when {
-        os.contains("mac") -> "macos"
-        os.contains("win") -> "windows"
-        else -> os.split(" ").first() // e.g. "linux"
-    }
-    val hostArch = when (val arch = System.getProperty("os.arch").lowercase()) {
-        "x86_64", "amd64" -> "x64"
-        "aarch64", "arm64" -> "arm64"
-        else -> arch
-    }
-    val renderer = if (hostOs == "macos") "metal" else "vulkan"
-    return "$renderer-$hostOs-$hostArch"
 }

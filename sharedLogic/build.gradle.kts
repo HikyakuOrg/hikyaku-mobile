@@ -24,8 +24,6 @@ kotlin {
             isStatic = true
         }
     }
-    
-    jvm()
 
     android {
        namespace = "org.hikyaku.mobile.sharedLogic"
@@ -68,9 +66,6 @@ kotlin {
             implementation(libs.androidx.startup.runtime)
             implementation(libs.androidx.work.runtime)
             implementation(libs.androidx.core.ktx)
-        }
-        jvmMain.dependencies {
-            implementation(libs.ktor.client.cio)
         }
         iosMain.dependencies {
             implementation(libs.ktor.client.darwin)

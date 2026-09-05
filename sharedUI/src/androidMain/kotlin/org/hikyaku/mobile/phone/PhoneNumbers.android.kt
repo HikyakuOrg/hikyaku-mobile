@@ -6,9 +6,6 @@ import java.util.Locale
 import org.hikyaku.mobile.phone.model.Country
 import org.hikyaku.mobile.phone.model.ParsedPhone
 
-// NOTE: This file is intentionally identical to its desktop twin
-// (jvmMain/.../PhoneNumbers.jvm.kt). Both targets are plain JVM and use libphonenumber the same
-// way; keep the two in sync when editing.
 actual object PhoneNumbers {
     private val util = PhoneNumberUtil.getInstance()
 

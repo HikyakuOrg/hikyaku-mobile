@@ -1,6 +1,6 @@
 ---
 name: kmp-lsp
-description: 'Kotlin/Java/Swift code navigation for this repo via the kmp-lsp CLI (no JVM, no Gradle sync). Use instead of Grep when finding a declaration, checking references, or getting type/signature info for a symbol in sharedLogic/sharedUI/androidApp/desktopApp/iosApp.'
+description: 'Kotlin/Java/Swift code navigation for this repo via the kmp-lsp CLI (no JVM, no Gradle sync). Use instead of Grep when finding a declaration, checking references, or getting type/signature info for a symbol in sharedLogic/sharedUI/androidApp/iosApp.'
 metadata:
   version: "0.26.0"
 ---
@@ -38,9 +38,9 @@ kmp-lsp extract-sources <pattern...> --dry-run       # materialize Gradle *-sour
 ```
 
 `find`/`refs` accept a bare name (`ScanPackagesOverlay`) or dotted FQN — both work. Run from the
-repo root, or pass `--root <path-to-hikyaku-mobile>`. This repo has 14 source roots across
-`androidApp`, `desktopApp`, `sharedLogic/{androidMain,commonMain,iosMain,jvmMain,*Test}`, and
-`sharedUI/{androidMain,commonMain,jvmMain,commonTest}` — `kmp-lsp sources --root .` lists them.
+repo root, or pass `--root <path-to-hikyaku-mobile>`. This repo has 10 source roots across
+`androidApp`, `sharedLogic/{androidMain,commonMain,iosMain,*Test}`, and
+`sharedUI/{androidMain,commonMain,commonTest}` — `kmp-lsp sources --root .` lists them.
 
 ##️ If `refs` comes back empty, verify `rg` first — don't trust it blindly
 

@@ -1186,7 +1186,7 @@ private fun TravelledRouteMapView(points: List<Point>, modifier: Modifier = Modi
         cameraState = cameraState,
         overlay = routeMapOverlay(),
     ) {
-        // Desktop MapLibre Compose can't render sources/layers yet; show the base map only there.
+        // Show the base map only where MapLibre Compose can't render sources/layers.
         if (mapLayersSupported) {
             val lineSource = rememberGeoJsonSource(
                 GeoJsonData.Features(Feature(LineString(positions), properties = null)),
@@ -1337,7 +1337,7 @@ private fun RouteMapView(
             },
             overlay = routeMapOverlay(),
         ) {
-            // Desktop MapLibre Compose can't render sources/layers yet; show the base map only there.
+            // Show the base map only where MapLibre Compose can't render sources/layers.
             if (mapLayersSupported) {
             if (returnLine.size >= 2) {
                 val returnFeature = Feature(

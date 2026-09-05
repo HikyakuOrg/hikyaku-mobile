@@ -23,7 +23,7 @@ those are compiled. `./gradlew syncModels` regenerates the full client into a bu
 scratch dir, then syncs the DTOs the app uses straight into
 `sharedLogic/src/commonMain/kotlin/org/hikyaku/mobile/api/generated/models/` (package
 `org.hikyaku.mobile.api.generated.models`) — reusable across every `sharedLogic` target
-(android/iosArm64/iosSimulatorArm64/jvm).
+(android/iosArm64/iosSimulatorArm64).
 
 | Endpoint | Repository | Generated DTOs used |
 | --- | --- | --- |

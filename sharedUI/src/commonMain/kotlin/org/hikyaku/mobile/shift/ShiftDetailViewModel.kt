@@ -72,7 +72,7 @@ private val ROUTE_HISTORY_PADDING = 10.seconds
  * Every running-shift transition is persisted to [ShiftSessionStore] so the shift survives the
  * app being killed: on Android a foreground service (via [ShiftTracker]) owns background location
  * streaming and the depot/completion check, and on relaunch this ViewModel restores the persisted
- * session and resumes. On iOS/desktop it falls back to streaming in-process.
+ * session and resumes. On iOS it falls back to streaming in-process.
  */
 class ShiftDetailViewModel(
     private val shiftId: String,
@@ -265,7 +265,7 @@ class ShiftDetailViewModel(
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state.asStateFlow()
 
-    /** Streams the driver's location in-process (iOS/desktop only); cancelled on completion/clear. */
+    /** Streams the driver's location in-process (iOS only); cancelled on completion/clear. */
     private var locationJob: Job? = null
 
     /** Decides when to poll the shift version and whether an answer is worth reporting. */
@@ -1041,7 +1041,7 @@ class ShiftDetailViewModel(
         )
     }
 
-    /** In-process location streaming for platforms where [ShiftTracker] doesn't (iOS/desktop). */
+    /** In-process location streaming for platforms where [ShiftTracker] doesn't (iOS). */
     private fun startLocationStream() {
         locationJob?.cancel()
         locationJob = viewModelScope.launch {

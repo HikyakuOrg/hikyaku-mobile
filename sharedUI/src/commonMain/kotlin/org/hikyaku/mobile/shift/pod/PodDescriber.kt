@@ -44,7 +44,7 @@ interface PodDescriberController {
 }
 
 /**
- * Android-only in practice: on JVM/desktop this is a permanent no-op ([PodDraftState.Unavailable]).
+ * Android-only in practice: elsewhere this is a permanent no-op ([PodDraftState.Unavailable]).
  */
 @Composable
 expect fun rememberPodDescriber(): PodDescriberController

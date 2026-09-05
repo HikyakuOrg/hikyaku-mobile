@@ -7,7 +7,7 @@ data class GoogleIdToken(val idToken: String, val rawNonce: String)
 
 /**
  * Returns a suspend function that launches the platform's native Google sign-in UI and
- * resolves with the resulting [GoogleIdToken]. No-op failure off Android (see the jvm actual).
+ * resolves with the resulting [GoogleIdToken]. No-op failure off Android.
  */
 @Composable
 expect fun rememberGoogleIdTokenLauncher(): suspend () -> Result<GoogleIdToken>

@@ -15,7 +15,7 @@ data class ScanDraft(
     val refreshing: Boolean = false,
     val refreshError: String? = null,
     val flashlightOn: Boolean = false,
-    /** The manual tracking-number escape hatch; also the only input path on desktop. */
+    /** The manual tracking-number escape hatch; also the only input path without a camera. */
     val manualEntry: String = "",
     val manualExpanded: Boolean = false,
 )

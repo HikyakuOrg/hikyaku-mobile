@@ -4,9 +4,9 @@ import org.hikyaku.mobile.phone.model.Country
 import org.hikyaku.mobile.phone.model.ParsedPhone
 
 /**
- * Phone-number utilities backed by libphonenumber on each JVM target (Android + desktop). The
- * country list, default region, validation and E.164 formatting all come from libphonenumber /
- * `java.util.Locale`, so no phone metadata is hand-maintained here. The Compose UI in
+ * Phone-number utilities backed by libphonenumber. The country list, default region, validation
+ * and E.164 formatting all come from libphonenumber / `java.util.Locale`, so no phone metadata is
+ * hand-maintained here. The Compose UI in
  * [PhoneNumberField] talks only to this object.
  */
 expect object PhoneNumbers {

@@ -799,7 +799,7 @@ private fun ShiftRouteMapPreview(
             options = MapOptions(gestureOptions = GestureOptions.AllDisabled),
             overlay = routeMapOverlay(),
         ) {
-            // Desktop MapLibre Compose can't render sources/layers yet; show the base map only there.
+            // Show the base map only where MapLibre Compose can't render sources/layers.
             if (mapLayersSupported) {
                 lines.forEachIndexed { index, line ->
                     if (line.size < 2) return@forEachIndexed

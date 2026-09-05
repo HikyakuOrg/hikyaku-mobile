@@ -9,7 +9,7 @@ import io.ktor.client.request.header
 import io.ktor.serialization.kotlinx.json.json
 import kotlinx.serialization.json.Json
 
-/** Platform HTTP engine (OkHttp on Android, CIO on JVM, Darwin on iOS). */
+/** Platform HTTP engine (OkHttp on Android, Darwin on iOS). */
 internal expect fun httpClientEngine(): HttpClientEngine
 
 /**

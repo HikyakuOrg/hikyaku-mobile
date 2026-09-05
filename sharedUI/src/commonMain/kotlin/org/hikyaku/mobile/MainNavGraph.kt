@@ -435,7 +435,7 @@ fun MainNavGraph(
 /**
  * Matched by route pattern string rather than a type-checking API, since
  * [NavDestination] only exposes a generic `hasRoute<T>()` helper on some targets (Android) but
- * not others (desktop) in this KMP build of navigation-compose.
+ * not others in this KMP build of navigation-compose.
  */
 private fun NavDestination.matchesRoute(qualifiedName: String?): Boolean = route == qualifiedName
 

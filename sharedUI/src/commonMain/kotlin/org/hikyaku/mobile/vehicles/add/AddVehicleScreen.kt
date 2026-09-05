@@ -291,7 +291,7 @@ private fun AddVehicleScreenPreview() {
  * The scanner is a full-screen [ScanVinOverlay] dialog, so whether it is open is pure view state:
  * it needs no route, no entry on [AddVehicleUiState] and no change to
  * [AddVehicleScreenContent]'s parameters, which keeps the preview below working unchanged. Hidden
- * entirely where [vinScanningSupported] is false, leaving plain text entry on desktop.
+ * entirely where [vinScanningSupported] is false, leaving plain text entry.
  *
  * On first appearing where scanning is supported, [VinEntryChoiceDialog] asks the user to scan or
  * type — same local-state trick, so it costs no new parameter either. However the VIN arrives —

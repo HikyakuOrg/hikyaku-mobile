@@ -362,60 +362,6 @@ private fun AddPackageScreenPreview() {
     }
 }
 
-// SCRATCH: temporary visual-QA harness, deleted after manual verification.
-@Composable
-fun AddPackageScreenHarness() {
-    var state by remember { mutableStateOf(AddPackageUiState()) }
-    HikyakuTheme {
-        AddPackageScreenContent(
-            state = state,
-            onNext = {
-                state = when (state.step) {
-                    AddPackageStep.Package -> state.copy(step = AddPackageStep.Sender)
-                    AddPackageStep.Sender -> state.copy(step = AddPackageStep.Receiver)
-                    AddPackageStep.Receiver -> state.copy(step = AddPackageStep.Delivery)
-                    AddPackageStep.Delivery -> state
-                }
-            },
-            onBack = {
-                state = when (state.step) {
-                    AddPackageStep.Package -> state
-                    AddPackageStep.Sender -> state.copy(step = AddPackageStep.Package)
-                    AddPackageStep.Receiver -> state.copy(step = AddPackageStep.Sender)
-                    AddPackageStep.Delivery -> state.copy(step = AddPackageStep.Receiver)
-                }
-            },
-            onCancel = {},
-            onSetWeight = { state = state.copy(weight = it) },
-            onSetLength = { state = state.copy(length = it) },
-            onSetWidth = { state = state.copy(width = it) },
-            onSetHeight = { state = state.copy(height = it) },
-            onAddImages = {},
-            onRemoveImage = {},
-            onSetSenderName = { state = state.copy(sender = state.sender.copy(name = it)) },
-            onSetSenderPhone = { state = state.copy(sender = state.sender.copy(phone = it)) },
-            onSetSenderCountry = { state = state.copy(sender = state.sender.copy(countryIso = it)) },
-            onSenderQueryChange = {},
-            onPickSenderAddress = {},
-            onPickSenderSuggestion = {},
-            onSetReceiverName = { state = state.copy(receiver = state.receiver.copy(name = it)) },
-            onSetReceiverPhone = { state = state.copy(receiver = state.receiver.copy(phone = it)) },
-            onSetReceiverCountry = { state = state.copy(receiver = state.receiver.copy(countryIso = it)) },
-            onReceiverQueryChange = {},
-            onPickReceiverAddress = {},
-            onPickReceiverSuggestion = {},
-            onSetDeliveryNotes = { state = state.copy(deliveryNotes = it) },
-            onSelectWarehouse = {},
-            onStartAddWarehouse = {},
-            onSetWarehouseName = {},
-            onWarehouseQueryChange = {},
-            onPickWarehouseAddress = {},
-            onSetArrivalDate = {},
-            onSetArrivalTime = { _, _ -> },
-        )
-    }
-}
-
 @Composable
 private fun DimensionsSection(
     state: AddPackageUiState,

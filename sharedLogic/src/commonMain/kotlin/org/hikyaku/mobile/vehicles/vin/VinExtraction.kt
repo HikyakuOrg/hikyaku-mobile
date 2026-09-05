@@ -3,7 +3,7 @@ package org.hikyaku.mobile.vehicles.vin
 /**
  * Pure VIN recognition logic: turns whatever a recogniser read off a vehicle label into ranked
  * 17-character VIN candidates. Deliberately free of Android, ML Kit and Compose types so the whole
- * ranking problem — which is the hard part — is unit-testable on the JVM with plain strings.
+ * ranking problem — which is the hard part — is unit-testable with plain strings.
  *
  * The two rules that shape everything here, both learned from real compliance labels:
  *

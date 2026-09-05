@@ -9,7 +9,7 @@ import org.hikyaku.mobile.shift.departure.model.PendingDeparture
  * system-managed, delivered via a broadcast even when the app is backgrounded or killed) and
  * persists the [PendingDeparture]; [disarm] removes them and clears the persisted context.
  *
- * On iOS/desktop both are no-ops: the feature is Android-only for now.
+ * On iOS both are no-ops: the feature is Android-only for now.
  */
 expect class DepartureWatcher() {
     /** Arms the geofence + activity-transition detectors and persists [pending]. */

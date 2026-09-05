@@ -37,13 +37,13 @@ sealed interface VinScanState {
     /** The image could not be decoded at all. Carries no message: the copy belongs to the UI. */
     data object Failed : VinScanState
 
-    /** Desktop, no camera, or no Google Play Services on this device. Terminal for the session. */
+    /** No camera, or no Google Play Services on this device. Terminal for the session. */
     data object Unsupported : VinScanState
 }
 
 /**
  * Drives VIN recognition for one scanner session. The Android actual owns the ML Kit clients and
- * the CameraX analysis loop; the JVM actual is permanently [VinScanState.Unsupported].
+ * the CameraX analysis loop; a platform without them is permanently [VinScanState.Unsupported].
  */
 @Stable
 interface VinScannerController {
@@ -71,7 +71,7 @@ interface VinScannerController {
     fun reset()
 }
 
-/** Android binds CameraX and ML Kit; the JVM actual returns a permanently unsupported stub. */
+/** Android binds CameraX and ML Kit; a platform without them returns an unsupported stub. */
 @Composable
 expect fun rememberVinScanner(): VinScannerController
 

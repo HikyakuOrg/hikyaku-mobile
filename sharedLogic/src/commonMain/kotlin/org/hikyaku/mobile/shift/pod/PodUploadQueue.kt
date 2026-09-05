@@ -6,9 +6,9 @@ package org.hikyaku.mobile.shift.pod
  * being lost.
  *
  * On Android [enqueue] persists the photo to disk and schedules a WorkManager job that retries
- * the upload once connectivity returns. On JVM/iOS, where there is no background work
- * infrastructure (and desktop isn't a courier surface), it's a no-op that always fails, so the
- * caller falls back to surfacing the original inline failure exactly as before this queue existed.
+ * the upload once connectivity returns. On iOS, where there is no background work
+ * infrastructure yet, it's a no-op that always fails, so the caller falls back to surfacing the
+ * original inline failure exactly as before this queue existed.
  */
 expect class PodUploadQueue() {
     /**

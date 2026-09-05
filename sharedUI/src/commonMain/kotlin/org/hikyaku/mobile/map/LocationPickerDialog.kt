@@ -124,7 +124,7 @@ fun LocationPickerDialog(
                         },
                     )
                     // The pin is a plain overlay icon (not a map marker layer) so it renders on every
-                    // platform, including desktop where MapLibre Compose can't draw layers yet.
+                    // platform, including any where MapLibre Compose can't draw layers yet.
                     Icon(
                         imageVector = LocationPinIcon,
                         contentDescription = null,

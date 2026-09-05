@@ -10,8 +10,8 @@ import org.hikyaku.mobile.shift.session.model.ShiftSession
  * after a kill. There [handlesLocationStreaming] is true, and the ViewModel must NOT also stream
  * location itself (that would double-upload).
  *
- * On iOS/desktop [handlesLocationStreaming] is false and start/stop are no-ops; those platforms
- * keep the existing in-ViewModel streaming with no background guarantees (unchanged behaviour).
+ * On iOS [handlesLocationStreaming] is false and start/stop are no-ops; that platform keeps the
+ * existing in-ViewModel streaming with no background guarantees (unchanged behaviour).
  */
 expect class ShiftTracker() {
     /** True when this platform handles location streaming via [start] (so the ViewModel shouldn't). */
