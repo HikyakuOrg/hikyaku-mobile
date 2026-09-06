@@ -179,7 +179,7 @@ class ShiftDetailRepository(
     private companion object {
         // Recipient columns pulled when resolving ad-hoc shift customers from the request meta.
         val CUSTOMER_COLUMNS = "id, customer_name, customer_phone, customer_address, " +
-            "customer_suburb, customer_state, customer_postcode"
+            "customer_suburb, customer_state, customer_postcode, customer_unit"
 
         // Mirrors the web dashboard's getRouteSteps select, trimmed to the fields the
         // mobile detail screen renders.
@@ -201,7 +201,8 @@ class ShiftDetailRepository(
                         customer_address,
                         customer_suburb,
                         customer_state,
-                        customer_postcode
+                        customer_postcode,
+                        customer_unit
                     )
                 )
             )

@@ -125,7 +125,7 @@ private fun AddWarehouseScreenContent(
                 query = state.query,
                 suggestions = state.suggestions,
                 searching = state.searching,
-                hasSelection = state.picked != null,
+                picked = state.picked,
                 initialMapPosition = state.picked?.let { Position(longitude = it.lon, latitude = it.lat) },
                 onQueryChange = onQueryChange,
                 onPick = onPickAddress,

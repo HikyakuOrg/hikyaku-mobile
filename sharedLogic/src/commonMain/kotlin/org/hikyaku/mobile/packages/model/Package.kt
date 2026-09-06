@@ -50,6 +50,8 @@ data class PackageParty(
     val phone: String?,
     /** Single-line address label built from the customer's address parts, or null if none. */
     val address: String?,
+    /** Unit, suite, or business name — a last-metre instruction, never part of [address]. */
+    val unit: String? = null,
 )
 
 /** Physical measurements of a package, from `package_dimensions`. */

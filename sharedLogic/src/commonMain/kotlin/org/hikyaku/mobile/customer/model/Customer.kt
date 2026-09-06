@@ -11,14 +11,19 @@ data class CustomerSuggestion(
     val name: String,
     val phoneE164: String?,
     val address: AddressSuggestion?,
+    /** Saved unit/suite/business name for the address, if one was captured. */
+    val unit: String? = null,
 )
 
 /**
  * A package's sender or receiver. [phoneE164] is pre-validated/null; [address] carries the
- * geocoded `[lng, lat]` used both as the party's location and as a routing stop.
+ * geocoded `[lng, lat]` used both as the party's location and as a routing stop. [unit] is what
+ * the user typed (a unit, suite, or business name) — kept off [AddressSuggestion] itself since
+ * that model is only ever what the geocoder returned.
  */
 data class CustomerInput(
     val name: String,
     val phoneE164: String?,
     val address: AddressSuggestion,
+    val unit: String? = null,
 )

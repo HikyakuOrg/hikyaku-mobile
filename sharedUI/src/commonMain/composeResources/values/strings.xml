@@ -213,6 +213,9 @@
     <string name="create_shift_label_address">Address</string>
     <string name="address_autocomplete_no_results">No address found</string>
     <string name="address_pick_on_map">Pick on map</string>
+    <string name="address_unit_label">Unit, suite, or business name</string>
+    <string name="address_building_escalation_message">%1$s looks like a building. Add a unit, suite, or business name so the driver can find you.</string>
+    <string name="address_building_escalation_dismiss">Deliver to the main entrance instead</string>
     <string name="location_picker_title">Choose a location</string>
     <string name="location_picker_confirm">Use this location</string>
     <string name="location_picker_resolving">Finding address…</string>
@@ -277,9 +280,11 @@
     <string name="package_error_sender_needs_name">Enter the sender's name.</string>
     <string name="package_error_sender_needs_phone">Enter a valid sender phone number.</string>
     <string name="package_error_sender_needs_address">Search and select the sender's address.</string>
+    <string name="package_error_sender_confirm_building">Add the sender's unit or business name, or confirm delivery to the main entrance.</string>
     <string name="package_error_receiver_needs_name">Enter the receiver's name.</string>
     <string name="package_error_receiver_needs_phone">Enter a valid receiver phone number.</string>
     <string name="package_error_receiver_needs_address">Search and select the receiver's address.</string>
+    <string name="package_error_receiver_confirm_building">Add the receiver's unit or business name, or confirm delivery to the main entrance.</string>
     <string name="package_error_choose_warehouse">Search and select a starting warehouse.</string>
     <string name="package_error_name_warehouse">Name this warehouse.</string>
     <string name="package_error_choose_saved_warehouse">Choose a starting warehouse.</string>

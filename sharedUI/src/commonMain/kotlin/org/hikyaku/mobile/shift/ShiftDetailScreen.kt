@@ -1030,9 +1030,12 @@ private fun navigationUrl(location: Point?, address: String): String? {
     }
 }
 
-/** Splits a comma-separated address string (street, suburb, postcode, ...) onto separate lines. */
+/**
+ * Splits an address string onto separate lines: first on any existing newline (a unit line
+ * `fullAddress` puts above the street), then each of those on commas (street, suburb, postcode, ...).
+ */
 private fun formatAddressMultiline(address: String): String =
-    address.split(',').map { it.trim() }.filter { it.isNotBlank() }.joinToString("\n")
+    address.split('\n', ',').map { it.trim() }.filter { it.isNotBlank() }.joinToString("\n")
 
 /** Minimal percent-encoding for a URL query component (RFC 3986 unreserved characters pass through unescaped). */
 private fun encodeUriComponent(value: String): String = buildString {
@@ -1942,7 +1945,9 @@ private fun PackageCard(
             }
             if (!editMode && isCurrent && showNavigate) {
                 val uriHandler = LocalUriHandler.current
-                navigationUrl(step.location, address)?.let { url ->
+                // Street only, never the unit: no maps app can route to a subpremise, and this is
+                // only a fallback query anyway — step.location covers the normal case.
+                navigationUrl(step.location, recipient?.streetAddress.orEmpty())?.let { url ->
                     Spacer(Modifier.height(8.dp))
                     OutlinedButton(onClick = { uriHandler.openUri(url) }) {
                         Icon(NavigationIcon, contentDescription = null, modifier = Modifier.size(18.dp))

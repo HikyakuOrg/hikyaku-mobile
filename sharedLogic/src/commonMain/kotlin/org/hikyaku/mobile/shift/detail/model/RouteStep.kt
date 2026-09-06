@@ -61,14 +61,16 @@ data class Customer(
     @SerialName("customer_suburb") val suburb: String? = null,
     @SerialName("customer_state") val state: String? = null,
     @SerialName("customer_postcode") val postcode: String? = null,
+    @SerialName("customer_unit") val unit: String? = null,
 ) {
     /**
-     * Single-line address: just the street/venue line from [address] (its part before the
-     * first comma) plus [suburb] and [state]/[postcode]. [address] is often a full geocoded
-     * string that already repeats the suburb/state/postcode, so only its first segment is used
-     * to avoid showing that twice.
+     * Single-line street address: just the street/venue line from [address] (its part before the
+     * first comma) plus [suburb] and [state]/[postcode]. [address] is often a full geocoded string
+     * that already repeats the suburb/state/postcode, so only its first segment is used to avoid
+     * showing that twice. Deliberately excludes [unit] — this is what navigation hand-off queries
+     * fall back to when a stop has no coordinates, and no maps app can route to a subpremise.
      */
-    val fullAddress: String
+    val streetAddress: String
         get() {
             val line = address?.substringBefore(',')?.trim().orEmpty()
             val stateAndPostcode = listOfNotNull(state?.takeIf { it.isNotBlank() }, postcode?.takeIf { it.isNotBlank() })
@@ -78,5 +80,16 @@ data class Customer(
                 suburb?.takeIf { it.isNotBlank() },
                 stateAndPostcode.takeIf { it.isNotBlank() },
             ).joinToString(", ")
+        }
+
+    /**
+     * Address for display: [unit] on its own line (a last-metre instruction, shown above the
+     * street the way a courier expects it) above [streetAddress]. With no [unit], this renders
+     * byte-identically to before HIK-54.
+     */
+    val fullAddress: String
+        get() {
+            val unitLine = unit?.trim()?.takeIf { it.isNotBlank() }
+            return listOfNotNull(unitLine, streetAddress.takeIf { it.isNotBlank() }).joinToString("\n")
         }
 }

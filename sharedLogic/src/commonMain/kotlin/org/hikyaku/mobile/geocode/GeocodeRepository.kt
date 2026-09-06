@@ -116,6 +116,9 @@ class GeocodeRepository(
             // Photon has no gid; osm_type + osm_id is the stable per-result identifier.
             gid = p.osmId?.let { "${p.osmType.orEmpty()}${it.toLong()}" },
             confidence = null,
+            osmKey = p.osmKey,
+            osmValue = p.osmValue,
+            extent = p.extent,
         )
     }
 }

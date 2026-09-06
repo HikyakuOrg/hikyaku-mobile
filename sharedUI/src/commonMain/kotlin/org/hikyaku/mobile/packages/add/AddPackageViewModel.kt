@@ -9,10 +9,12 @@ import hikyaku.sharedui.generated.resources.package_error_choose_warehouse
 import hikyaku.sharedui.generated.resources.package_error_invalid_dimensions
 import hikyaku.sharedui.generated.resources.package_error_invalid_weight
 import hikyaku.sharedui.generated.resources.package_error_name_warehouse
+import hikyaku.sharedui.generated.resources.package_error_receiver_confirm_building
 import hikyaku.sharedui.generated.resources.package_error_receiver_needs_address
 import hikyaku.sharedui.generated.resources.package_error_receiver_needs_name
 import hikyaku.sharedui.generated.resources.package_error_receiver_needs_phone
 import hikyaku.sharedui.generated.resources.package_error_save_warehouse_failed
+import hikyaku.sharedui.generated.resources.package_error_sender_confirm_building
 import hikyaku.sharedui.generated.resources.package_error_sender_needs_address
 import hikyaku.sharedui.generated.resources.package_error_sender_needs_name
 import hikyaku.sharedui.generated.resources.package_error_sender_needs_phone
@@ -27,6 +29,7 @@ import org.hikyaku.mobile.customer.model.CustomerInput
 import org.hikyaku.mobile.customer.model.CustomerSuggestion
 import org.hikyaku.mobile.geocode.GeocodeRepository
 import org.hikyaku.mobile.geocode.model.AddressSuggestion
+import org.hikyaku.mobile.geocode.model.isLikelyBuilding
 import org.hikyaku.mobile.packages.PackageRepository
 import org.hikyaku.mobile.packages.model.PackageDraft
 import org.hikyaku.mobile.phone.PhoneNumbers
@@ -59,7 +62,14 @@ data class CustomerDraft(
     val suggestions: List<AddressSuggestion> = emptyList(),
     val searching: Boolean = false,
     val picked: AddressSuggestion? = null,
-)
+    val unit: String = "",
+    /** Dismissed via the "deliver to the main entrance" escape hatch on the current [picked] building. */
+    val buildingEscalationDismissed: Boolean = false,
+) {
+    /** Whether [picked] looks like a building and the user hasn't opted out via the escape hatch. */
+    val isEscalatingBuilding: Boolean
+        get() = picked != null && isLikelyBuilding(picked) && !buildingEscalationDismissed
+}
 
 data class AddPackageUiState(
     val isLoading: Boolean = false,
@@ -196,6 +206,12 @@ class AddPackageViewModel(
     fun pickSenderSuggestion(suggestion: CustomerSuggestion) = pickCustomerSuggestion(Party.SENDER, suggestion)
     fun pickReceiverSuggestion(suggestion: CustomerSuggestion) = pickCustomerSuggestion(Party.RECEIVER, suggestion)
 
+    fun setSenderUnit(unit: String) = updateCustomer(Party.SENDER) { it.copy(unit = unit) }
+    fun setReceiverUnit(unit: String) = updateCustomer(Party.RECEIVER) { it.copy(unit = unit) }
+
+    fun dismissSenderBuildingEscalation() = updateCustomer(Party.SENDER) { it.copy(buildingEscalationDismissed = true) }
+    fun dismissReceiverBuildingEscalation() = updateCustomer(Party.RECEIVER) { it.copy(buildingEscalationDismissed = true) }
+
     private fun setCustomerName(party: Party, name: String) {
         updateCustomer(party) { it.copy(name = name) }
         customerNameJobs.remove(party)?.cancel()
@@ -228,6 +244,9 @@ class AddPackageViewModel(
                 picked = suggestion.address ?: it.picked,
                 suggestions = emptyList(),
                 searching = false,
+                unit = suggestion.unit ?: it.unit,
+                // A returning customer's own saved address is never a fresh escalation prompt.
+                buildingEscalationDismissed = true,
             )
         }
     }
@@ -256,7 +275,14 @@ class AddPackageViewModel(
     private fun pickCustomerAddress(party: Party, suggestion: AddressSuggestion) {
         customerGeocodeJobs.remove(party)?.cancel()
         updateCustomer(party) {
-            it.copy(picked = suggestion, addressQuery = suggestion.label, suggestions = emptyList(), searching = false)
+            it.copy(
+                picked = suggestion,
+                addressQuery = suggestion.label,
+                suggestions = emptyList(),
+                searching = false,
+                // A newly picked address gets a fresh escalation check, not the previous pick's.
+                buildingEscalationDismissed = false,
+            )
         }
     }
 
@@ -440,6 +466,7 @@ class AddPackageViewModel(
         address = checkNotNull(draft.picked) {
             "validationProblem should have rejected ${draft.localId} with no geocoded address."
         },
+        unit = draft.unit.trim().ifBlank { null },
     )
 
     private suspend fun resolveWarehouse(s: AddPackageUiState): WarehouseOption? {
@@ -469,6 +496,7 @@ class AddPackageViewModel(
         s.sender.name.isBlank() -> getString(Res.string.package_error_sender_needs_name)
         customerE164(s.sender) == null -> getString(Res.string.package_error_sender_needs_phone)
         s.sender.picked == null -> getString(Res.string.package_error_sender_needs_address)
+        s.sender.isEscalatingBuilding && s.sender.unit.isBlank() -> getString(Res.string.package_error_sender_confirm_building)
         else -> null
     }
 
@@ -476,6 +504,7 @@ class AddPackageViewModel(
         s.receiver.name.isBlank() -> getString(Res.string.package_error_receiver_needs_name)
         customerE164(s.receiver) == null -> getString(Res.string.package_error_receiver_needs_phone)
         s.receiver.picked == null -> getString(Res.string.package_error_receiver_needs_address)
+        s.receiver.isEscalatingBuilding && s.receiver.unit.isBlank() -> getString(Res.string.package_error_receiver_confirm_building)
         else -> null
     }
 

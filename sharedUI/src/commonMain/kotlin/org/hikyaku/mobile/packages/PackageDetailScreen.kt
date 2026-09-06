@@ -469,7 +469,14 @@ private fun PartyRow(label: String, party: PackageParty, dotColor: Color) {
             party.phone?.let { phone ->
                 IconLine(Icons.Filled.Phone, phone)
             }
-            IconLine(Icons.Filled.Place, party.address ?: stringResource(Res.string.package_detail_no_address))
+            // Unit above the street line, same order as the driver's stop card — but only
+            // alongside a real address; a unit with nothing to qualify isn't worth showing.
+            val addressText = if (party.address != null) {
+                listOfNotNull(party.unit?.takeIf { it.isNotBlank() }, party.address).joinToString("\n")
+            } else {
+                stringResource(Res.string.package_detail_no_address)
+            }
+            IconLine(Icons.Filled.Place, addressText)
         }
     }
 }

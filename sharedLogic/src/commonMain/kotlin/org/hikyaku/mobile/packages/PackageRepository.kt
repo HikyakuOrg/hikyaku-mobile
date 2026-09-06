@@ -120,8 +120,8 @@ class PackageRepository(
             .select(
                 Columns.raw(
                     "customer_name, customer_phone, customer_address, customer_suburb, " +
-                        "customer_state, customer_postcode, customer_country, customer_location, " +
-                        "geocode_confidence, pelias_gid",
+                        "customer_state, customer_postcode, customer_country, customer_unit, " +
+                        "customer_location, geocode_confidence, pelias_gid",
                 ),
             ) {
                 filter {
@@ -216,6 +216,10 @@ class PackageRepository(
      * duplicate. `customer` has a unique constraint on `(organisation_id, customer_phone)`, so a
      * phone match is looked up first; phone-less customers can't collide on that constraint, so
      * they're always inserted.
+     *
+     * A phone match reuses the stored row as-is — including its address and, now, its unit — even
+     * if this draft carries a different one (HIK-52). Pre-existing behaviour for the whole address;
+     * the unit deliberately inherits it rather than special-casing one field of the same row.
      */
     private suspend fun ensureCustomer(orgId: String, customer: CustomerInput): String {
         val phone = customer.phoneE164
@@ -243,6 +247,7 @@ class PackageRepository(
                 customerState = customer.address.state,
                 customerPostcode = customer.address.postcode,
                 customerCountry = customer.address.country,
+                customerUnit = customer.unit?.trim()?.takeIf { it.isNotBlank() },
                 customerLocation = pointEwkt(customer.address.lon, customer.address.lat),
                 geocodeConfidence = customer.address.confidence,
                 peliasGid = customer.address.gid,
@@ -268,10 +273,10 @@ class PackageRepository(
             "id, tracking_number, created_at, delivery_notes, " +
                 "sender:customer!packages_from_customer_fkey(" +
                 "customer_name, customer_phone, customer_address, customer_suburb, " +
-                "customer_state, customer_postcode, customer_country), " +
+                "customer_state, customer_postcode, customer_country, customer_unit), " +
                 "receiver:customer!packages_to_customer_fkey(" +
                 "customer_name, customer_phone, customer_address, customer_suburb, " +
-                "customer_state, customer_postcode, customer_country), " +
+                "customer_state, customer_postcode, customer_country, customer_unit), " +
                 "warehouse:warehouse!packages_warehouse_id_fkey(warehouse_name, warehouse_address), " +
                 "package_dimensions(weight_kg, length_cm, width_cm, height_cm), " +
                 "package_delivery_window(scheduled_departure, actual_departure, " +
@@ -332,6 +337,7 @@ private data class PartyRow(
     @SerialName("customer_state") val state: String? = null,
     @SerialName("customer_postcode") val postcode: String? = null,
     @SerialName("customer_country") val country: String? = null,
+    @SerialName("customer_unit") val unit: String? = null,
 ) {
     fun toParty(): PackageParty {
         // Prefer the full street address, then append the parts it doesn't already contain.
@@ -344,6 +350,7 @@ private data class PartyRow(
             name = name?.takeIf { it.isNotBlank() },
             phone = phone?.takeIf { it.isNotBlank() },
             address = label,
+            unit = unit?.takeIf { it.isNotBlank() },
         )
     }
 }
@@ -398,6 +405,7 @@ private data class CustomerRow(
     @SerialName("customer_state") val state: String? = null,
     @SerialName("customer_postcode") val postcode: String? = null,
     @SerialName("customer_country") val country: String? = null,
+    @SerialName("customer_unit") val unit: String? = null,
     @SerialName("customer_location") val location: Point? = null,
     @SerialName("geocode_confidence") val confidence: Double? = null,
     @SerialName("pelias_gid") val gid: String? = null,
@@ -423,6 +431,7 @@ private data class CustomerRow(
                 gid = gid,
                 confidence = confidence,
             ),
+            unit = unit?.takeIf { it.isNotBlank() },
         )
     }
 }
@@ -437,6 +446,9 @@ private data class CustomerInsert(
     @SerialName("customer_state") val customerState: String?,
     @SerialName("customer_postcode") val customerPostcode: String?,
     @SerialName("customer_country") val customerCountry: String?,
+    // No default: a Kotlin default shrinks the column list supabase-kt actually writes, silently
+    // dropping this value even when it's a deliberate null.
+    @SerialName("customer_unit") val customerUnit: String?,
     @SerialName("customer_location") val customerLocation: String,
     @SerialName("geocode_confidence") val geocodeConfidence: Double?,
     @SerialName("pelias_gid") val peliasGid: String?,
