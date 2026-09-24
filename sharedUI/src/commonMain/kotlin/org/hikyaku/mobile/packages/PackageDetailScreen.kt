@@ -375,7 +375,8 @@ private const val QR_LOGO_REQUEST_PX = 256
  * it draws, so a painter that fills in later would never appear - passing the loaded flag as a key
  * rebuilds the code at that point instead. A logo that fails to load leaves a plain code rather
  * than a hole in the middle of one. Error correction goes to [QrKitErrorCorrection.High] so a
- * scanner can still recover the modules the logo covers.
+ * scanner can still recover the modules the logo covers. The logo is decoded as a software bitmap
+ * because the buffer the QR painter draws into can't take a hardware one.
  */
 @Composable
 private fun rememberBrandedQrPainter(data: String, logoUrl: String?): Painter {
@@ -383,7 +384,11 @@ private fun rememberBrandedQrPainter(data: String, logoUrl: String?): Painter {
 
     val context = LocalPlatformContext.current
     val request = remember(context, logoUrl) {
-        ImageRequest.Builder(context).data(logoUrl).size(QR_LOGO_REQUEST_PX).build()
+        ImageRequest.Builder(context)
+            .data(logoUrl)
+            .size(QR_LOGO_REQUEST_PX)
+            .softwareBitmap()
+            .build()
     }
     val logoPainter = rememberAsyncImagePainter(model = request)
     val logoState by logoPainter.state.collectAsState()
