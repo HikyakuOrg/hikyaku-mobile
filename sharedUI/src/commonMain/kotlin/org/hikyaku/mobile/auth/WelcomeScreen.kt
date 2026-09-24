@@ -58,7 +58,7 @@ fun WelcomeScreen(
         OutlinedButton(onClick = onSignUpClick, modifier = Modifier.fillMaxWidth()) { Text(stringResource(Res.string.auth_sign_up)) }
         // The active environment may not have Google sign-in set up (e.g. most self-hosted
         // instances) - GoogleAuthConfig is only populated when the environment endpoint
-        // returns a GOOGLE_WEB_CLIENT_ID, so there's nothing to show without it.
+        // returns a GOOGLE_CLIENT_ID, so there's nothing to show without it.
         if (GoogleAuthConfig.isConfigured) {
             Spacer(Modifier.height(12.dp))
             // Google's pre-approved button asset (see developers.google.com/identity/branding-guidelines) -

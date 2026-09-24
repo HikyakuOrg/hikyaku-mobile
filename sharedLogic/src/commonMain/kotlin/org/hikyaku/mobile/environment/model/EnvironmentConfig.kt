@@ -13,7 +13,7 @@ data class EnvironmentConfig(
     @SerialName("SUPABASE_ANON_KEY") val supabaseAnonKey: String,
     @SerialName("HIKYAKU_API_URL") val hikyakuApiUrl: String,
     /** Google OAuth Web Client ID. Absent on instances that haven't set up Google sign-in. */
-    @SerialName("GOOGLE_WEB_CLIENT_ID") val googleWebClientId: String? = null,
+    @SerialName("GOOGLE_CLIENT_ID") val googleWebClientId: String? = null,
 )
 
 /** Where the [EnvironmentConfig] is fetched from. */
