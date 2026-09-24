@@ -322,7 +322,7 @@ private fun PackageDetailScreenPreview() {
 
 @Composable
 private fun HeroCard(detail: PackageDetail, orgLogoUrl: String?) {
-    val printShippingLabel = rememberPrintShippingLabel()
+    val printShippingLabel = rememberPrintShippingLabel(orgLogoUrl)
     ElevatedCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             Modifier.fillMaxWidth().padding(20.dp),
@@ -362,11 +362,11 @@ private fun HeroCard(detail: PackageDetail, orgLogoUrl: String?) {
 }
 
 /** Fraction of the QR code's width the logo takes up, and the cleared margin drawn around it. */
-private const val QR_LOGO_SIZE = 0.25f
-private const val QR_LOGO_PADDING = 0.1f
+internal const val QR_LOGO_SIZE = 0.25f
+internal const val QR_LOGO_PADDING = 0.1f
 
 /** Pixel size the logo is decoded at - generous for the ~50dp square it ends up in. */
-private const val QR_LOGO_REQUEST_PX = 256
+internal const val QR_LOGO_REQUEST_PX = 256
 
 /**
  * A QR code for [data], with [logoUrl] drawn in the middle when the org has branding to show.
