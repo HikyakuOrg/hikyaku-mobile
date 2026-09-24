@@ -77,8 +77,8 @@ private val ROUTE_HISTORY_PADDING = 10.seconds
 class ShiftDetailViewModel(
     private val shiftId: String,
     orgSlug: String,
-    private val orgId: String = "",
-    val orgName: String = "",
+    orgId: String = "",
+    orgName: String = "",
     private val repository: ShiftDetailRepository = ShiftDetailRepository(),
     private val routingRepository: RoutingRepository = RoutingRepository(),
     private val routePoiRepository: RoutePoiRepository = RoutePoiRepository(),
@@ -96,7 +96,12 @@ class ShiftDetailViewModel(
 ) : ViewModel() {
 
     /** On a cold-start resume the passed slug may be blank; fall back to the persisted session's. */
-    private val orgSlug: String = orgSlug.ifBlank { sessionStore.load()?.orgSlug.orEmpty() }
+    private var orgSlug: String = orgSlug.ifBlank { sessionStore.load()?.orgSlug.orEmpty() }
+
+    private var orgId: String = orgId
+
+    private val _orgName = MutableStateFlow(orgName)
+    val orgName: StateFlow<String> = _orgName.asStateFlow()
 
     private val environmentSource: EnvironmentSource = environmentStore.load()?.source ?: EnvironmentSource.Default
 
@@ -327,6 +332,22 @@ class ShiftDetailViewModel(
                     )
                 }
         }
+    }
+
+    /**
+     * Re-applies the selected organisation. The values passed at construction are blank when a back
+     * stack restored after process death reaches this screen before the organisations have loaded.
+     * Blank values are ignored so they never clobber the persisted session's slug.
+     */
+    fun setOrganisation(orgSlug: String, orgId: String, orgName: String) {
+        val slugArrived = this.orgSlug.isBlank() && orgSlug.isNotBlank()
+        if (orgSlug.isNotBlank()) this.orgSlug = orgSlug
+        if (orgId.isNotBlank()) this.orgId = orgId
+        if (orgName.isNotBlank()) _orgName.value = orgName
+        // The road-snapped line needs the slug; a route loaded without it fell back to straight segments.
+        val s = _state.value
+        val routeId = s.selectedRouteId
+        if (slugArrived && routeId != null && s.steps.isNotEmpty()) loadRouteLine(routeId, s.steps)
     }
 
     fun selectRoute(routeId: String) {

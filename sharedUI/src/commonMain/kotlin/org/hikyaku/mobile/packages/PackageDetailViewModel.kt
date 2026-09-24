@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.hikyaku.mobile.environment.EnvironmentStore
 import org.hikyaku.mobile.environment.model.EnvironmentSource
+import org.hikyaku.mobile.organisation.model.Organisation
 import org.hikyaku.mobile.packages.model.PackageDetail
 import org.hikyaku.mobile.tracking.buildTrackingUrl
 import org.jetbrains.compose.resources.getString
@@ -41,27 +42,40 @@ data class PackageDetailUiState(
  */
 class PackageDetailViewModel(
     private val trackingNumber: String,
-    orgSlug: String = "",
-    orgName: String = "",
-    orgLogoUrl: String? = null,
-    private val isPersonalOrg: Boolean = false,
+    organisation: Organisation? = null,
     private val repository: PackageRepository = PackageRepository(),
     environmentStore: EnvironmentStore = EnvironmentStore(),
 ) : ViewModel() {
 
-    private val _state = MutableStateFlow(
-        PackageDetailUiState(
-            orgName = orgName,
-            orgLogoUrl = orgLogoUrl,
-            trackingUrl = orgSlug.takeIf { it.isNotBlank() }?.let {
-                buildTrackingUrl(environmentStore.load()?.source ?: EnvironmentSource.Default, it, trackingNumber)
-            },
-        ),
-    )
+    private val environmentSource: EnvironmentSource = environmentStore.load()?.source ?: EnvironmentSource.Default
+
+    private var isPersonalOrg = false
+
+    private val _state = MutableStateFlow(PackageDetailUiState())
     val state: StateFlow<PackageDetailUiState> = _state.asStateFlow()
 
     init {
+        setOrganisation(organisation)
         load()
+    }
+
+    /**
+     * Applies the selected organisation's branding (name, QR logo, tracking link) and delete
+     * permission. The caller re-applies it whenever the selection changes, not only at
+     * construction: a back stack restored after process death reaches this screen before the
+     * organisations have loaded, so the first value is often null.
+     */
+    fun setOrganisation(organisation: Organisation?) {
+        isPersonalOrg = organisation?.isPersonal == true
+        val s = _state.value
+        _state.value = s.copy(
+            orgName = organisation?.displayName.orEmpty(),
+            orgLogoUrl = organisation?.brandingLogoUrl,
+            trackingUrl = organisation?.slug?.takeIf { it.isNotBlank() }?.let {
+                buildTrackingUrl(environmentSource, it, trackingNumber)
+            },
+            canDelete = s.detail?.let(::canDelete) == true,
+        )
     }
 
     fun load() {
@@ -73,7 +87,7 @@ class PackageDetailViewModel(
                         isLoading = false,
                         detail = detail,
                         error = null,
-                        canDelete = isPersonalOrg && detail.currentStatusEnum in DELETABLE_STATUSES,
+                        canDelete = canDelete(detail),
                     )
                     loadImages(detail.id)
                 }
@@ -120,6 +134,9 @@ class PackageDetailViewModel(
     fun dismissDeleteError() {
         _state.value = _state.value.copy(deleteError = null)
     }
+
+    private fun canDelete(detail: PackageDetail): Boolean =
+        isPersonalOrg && detail.currentStatusEnum in DELETABLE_STATUSES
 
     private companion object {
         val DELETABLE_STATUSES = setOf("PENDING", "ASSIGNED")

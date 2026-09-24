@@ -243,19 +243,13 @@ fun MainNavGraph(
             }
             composable<PackageDetailRoute> { entry ->
                 val trackingNumber = entry.toRoute<PackageDetailRoute>().trackingNumber
-                val orgSlug = homeState.selectedOrganisation?.slug ?: ""
-                val orgName = homeState.selectedOrganisation?.displayName ?: ""
-                val orgLogoUrl = homeState.selectedOrganisation?.brandingLogoUrl
-                val isPersonalOrg = homeState.selectedOrganisation?.isPersonal == true
+                val organisation = homeState.selectedOrganisation
                 val detailViewModel: PackageDetailViewModel = viewModel(key = trackingNumber) {
-                    PackageDetailViewModel(
-                        trackingNumber = trackingNumber,
-                        orgSlug = orgSlug,
-                        orgName = orgName,
-                        orgLogoUrl = orgLogoUrl,
-                        isPersonalOrg = isPersonalOrg,
-                    )
+                    PackageDetailViewModel(trackingNumber = trackingNumber, organisation = organisation)
                 }
+                // Re-applied on change, not just passed at construction: a back stack restored after
+                // process death lands here before the organisations have loaded.
+                LaunchedEffect(detailViewModel, organisation) { detailViewModel.setOrganisation(organisation) }
                 val detailState by detailViewModel.state.collectAsState()
                 // A successful delete pops back to the list and asks it to refresh, the same signal
                 // AddPackageRoute's onDone sends — the list doesn't care whether an entry was added
@@ -320,7 +314,9 @@ fun MainNavGraph(
             }
             composable<AddMaintenanceRoute> { entry ->
                 val vehicleId = entry.toRoute<AddMaintenanceRoute>().vehicleId
-                val addMaintenanceViewModel: AddMaintenanceViewModel = viewModel(key = vehicleId) {
+                // Keyed on the org too, like the list routes: a restored back stack can reach this
+                // form before the organisations load, and the view model holds the org it was built with.
+                val addMaintenanceViewModel: AddMaintenanceViewModel = viewModel(key = "$vehicleId/${homeState.selectedOrgId}") {
                     AddMaintenanceViewModel(orgId = homeState.selectedOrgId.orEmpty(), vehicleId = vehicleId)
                 }
                 AddMaintenanceScreen(
@@ -333,7 +329,8 @@ fun MainNavGraph(
                 )
             }
             composable<AddVehicleRoute> { entry ->
-                val addVehicleViewModel: AddVehicleViewModel = viewModel {
+                // Keyed on the org so a form reached before the organisations load is rebuilt once they do.
+                val addVehicleViewModel: AddVehicleViewModel = viewModel(key = homeState.selectedOrgId) {
                     AddVehicleViewModel(
                         orgId = homeState.selectedOrgId.orEmpty(),
                         isPersonalOrg = homeState.selectedOrganisation?.isPersonal == true,
@@ -358,7 +355,8 @@ fun MainNavGraph(
                 )
             }
             composable<AddPackageRoute> {
-                val addPackageViewModel: AddPackageViewModel = viewModel {
+                // Keyed on the org so a form reached before the organisations load is rebuilt once they do.
+                val addPackageViewModel: AddPackageViewModel = viewModel(key = homeState.selectedOrgId) {
                     AddPackageViewModel(
                         orgId = homeState.selectedOrgId.orEmpty(),
                         orgSlug = homeState.selectedOrganisation?.slug.orEmpty(),
@@ -399,7 +397,8 @@ fun MainNavGraph(
                 )
             }
             composable<AddWarehouseRoute> {
-                val addWarehouseViewModel: AddWarehouseViewModel = viewModel {
+                // Keyed on the org so a form reached before the organisations load is rebuilt once they do.
+                val addWarehouseViewModel: AddWarehouseViewModel = viewModel(key = homeState.selectedOrgId) {
                     AddWarehouseViewModel(orgId = homeState.selectedOrgId.orEmpty())
                 }
                 AddWarehouseScreen(
@@ -420,6 +419,11 @@ fun MainNavGraph(
                 val orgId = homeState.selectedOrgId ?: ""
                 val detailViewModel: ShiftDetailViewModel = viewModel(key = shiftId) {
                     ShiftDetailViewModel(shiftId = shiftId, orgSlug = orgSlug, orgId = orgId, orgName = orgName)
+                }
+                // Not re-keyed like the form routes below: recreating this view model would restart
+                // a running shift's tracking. Pushes org values that arrive after a restore instead.
+                LaunchedEffect(detailViewModel, orgSlug, orgId, orgName) {
+                    detailViewModel.setOrganisation(orgSlug = orgSlug, orgId = orgId, orgName = orgName)
                 }
                 ShiftDetailScreen(
                     viewModel = detailViewModel,

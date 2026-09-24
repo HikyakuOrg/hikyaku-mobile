@@ -287,6 +287,7 @@ fun ShiftDetailScreen(
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val orgName by viewModel.orgName.collectAsStateWithLifecycle()
 
     // The 30-second shift-version poll runs only while this screen is actually on top: a
     // backgrounded app has nobody to tell, and the driver is the only reason to spend the request.
@@ -302,7 +303,7 @@ fun ShiftDetailScreen(
 
     ShiftDetailScreenContent(
         state = state,
-        orgName = viewModel.orgName,
+        orgName = orgName,
         onBack = onBack,
         onPackageClick = onPackageClick,
         onVehicleClick = onVehicleClick,
