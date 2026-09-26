@@ -24,6 +24,11 @@ concurrency:
 
 env:
   PACKAGE_ID: org.hikyaku.mobile
+  # AWS CLI v2 sends CRC checksums on every upload by default. Supabase
+  # Storage and some other S3-compatible hosts reject them on multipart
+  # UploadPart calls, so only send checksums when the operation requires one.
+  AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+  AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
 
 jobs:
   build-and-release:
